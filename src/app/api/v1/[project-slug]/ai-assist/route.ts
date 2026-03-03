@@ -167,20 +167,37 @@ export async function POST(
       geminiBody.tools = [{ googleSearch: {} }];
     }
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiBody),
-      }
-    );
+    const FALLBACK_MODEL = "gemini-2.5-flash";
+
+    // Helper: call Gemini with a specific model
+    async function callGemini(targetModel: string) {
+      return fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(geminiBody),
+        }
+      );
+    }
+
+    // Try primary model first
+    let res = await callGemini(model);
+    let usedModel = model;
+
+    // Fallback on 502, 503, 429 (rate limit), or 404 (model not found)
+    if (!res.ok && [502, 503, 429, 404].includes(res.status) && model !== FALLBACK_MODEL) {
+      const primaryErr = await res.text();
+      console.warn(`[AI] Primary model ${model} failed (${res.status}), falling back to ${FALLBACK_MODEL}`, primaryErr);
+      res = await callGemini(FALLBACK_MODEL);
+      usedModel = FALLBACK_MODEL;
+    }
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("Gemini API error:", err);
+      console.error("Gemini API error:", res.status, err);
       return NextResponse.json(
-        { error: "AI service error" },
+        { error: "AI service error", details: err, status: res.status, model: usedModel },
         { status: 502 }
       );
     }
@@ -202,6 +219,7 @@ export async function POST(
 
     return NextResponse.json({
       result: text,
+      model: usedModel,
       ...(groundingChunks.length > 0 && { groundingChunks }),
     });
   } catch (error) {

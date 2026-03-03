@@ -22,10 +22,21 @@ export async function GET(
   try {
     const supabase = createAdminClient();
 
+    // Resolve slug → project UUID
+    const { data: project, error: projErr } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("slug", projectSlug)
+      .single();
+
+    if (projErr || !project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
     const { data: allArticles, error: artErr } = await supabase
       .from("articles")
       .select("*")
-      .eq("project_id", projectSlug)
+      .eq("project_id", project.id)
       .order("created_at", { ascending: false });
 
     if (artErr) throw artErr;
@@ -90,10 +101,26 @@ export async function POST(
     const data = createSchema.parse(body);
     const supabase = createAdminClient();
 
+    // Sanitize category — AI may send "macro_economics/global_markets/..." → take first
+    const sanitizedCategory = data.category.includes("/")
+      ? data.category.split("/")[0].trim()
+      : data.category;
+
+    // Resolve slug → project UUID
+    const { data: project, error: projErr } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("slug", projectSlug)
+      .single();
+
+    if (projErr || !project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
     // Create article
     const { data: article, error: artErr } = await supabase
       .from("articles")
-      .insert({ slug: data.slug, category: data.category, project_id: projectSlug })
+      .insert({ slug: data.slug, category: sanitizedCategory, project_id: project.id })
       .select()
       .single();
 
@@ -122,9 +149,10 @@ export async function POST(
         { status: 400 }
       );
     }
-    console.error("Failed to create article:", error instanceof Error ? error.message : error);
+    console.error("Failed to create article:", JSON.stringify(error, null, 2));
+    const supaErr = error as { message?: string; code?: string; hint?: string; details?: string };
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal Server Error" },
+      { error: supaErr?.message ?? "Internal Server Error", code: supaErr?.code, hint: supaErr?.hint, details: supaErr?.details },
       { status: 500 }
     );
   }

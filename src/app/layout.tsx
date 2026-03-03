@@ -20,6 +20,15 @@ export const metadata: Metadata = {
   },
   description:
     "Docilog: AI destekli çok-alanlı blog yönetim platformu.",
+  icons: {
+    icon: "/docilog.ico",
+    apple: "/docilog.png",
+  },
+  openGraph: {
+    title: "Docilog — AI Blog Platformu",
+    description: "AI destekli çok-alanlı içerik yönetim platformu. Her alan için uzman AI persona'ları ile profesyonel içerik üretimi.",
+    images: ["/docilog.png"],
+  },
 };
 
 export default function RootLayout({

@@ -21,11 +21,15 @@ export async function GET(
   }
   const supabase = createAdminClient();
 
+  // Resolve slug → project UUID
+  const { data: proj } = await supabase.from("projects").select("id").eq("slug", projectSlug).single();
+  if (!proj) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
   const { data: article, error: artErr } = await supabase
     .from("articles")
     .select("*")
     .eq("id", id)
-    .eq("project_id", projectSlug)
+    .eq("project_id", proj.id)
     .single();
 
   if (artErr || !article) {
@@ -73,7 +77,10 @@ export async function PUT(
       if (data.slug) updates.slug = data.slug;
       if (data.category) updates.category = data.category;
 
-      const { data: existing, error: err } = await supabase.from("articles").select("id").eq("id", id).eq("project_id", projectSlug).single();
+      // Resolve slug → project UUID
+      const { data: proj2 } = await supabase.from("projects").select("id").eq("slug", projectSlug).single();
+      if (!proj2) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      const { data: existing, error: err } = await supabase.from("articles").select("id").eq("id", id).eq("project_id", proj2.id).single();
       if (!existing || err) {
          return NextResponse.json({ error: "Not found or access denied" }, { status: 404 });
       }
@@ -125,7 +132,10 @@ export async function DELETE(
 
   const supabase = createAdminClient();
 
-  const { data: existing, error: err } = await supabase.from("articles").select("id").eq("id", id).eq("project_id", projectSlug).single();
+  // Resolve slug → project UUID
+  const { data: proj3 } = await supabase.from("projects").select("id").eq("slug", projectSlug).single();
+  if (!proj3) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  const { data: existing, error: err } = await supabase.from("articles").select("id").eq("id", id).eq("project_id", proj3.id).single();
   if (!existing || err) {
       return NextResponse.json({ error: "Not found or access denied" }, { status: 404 });
   }
