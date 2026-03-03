@@ -22,8 +22,20 @@ const categoryLabels: Record<string, string> = {
   sight_reading: "Deşifre",
   performance: "Performans",
   exam_prep: "Sınav Hazırlık",
+  macro_economics: "Makro Ekonomi",
+  technical_analysis: "Teknik Analiz",
+  crypto: "Kripto",
+  geopolitical_risk: "Jeopolitik Risk",
+  global_markets: "Küresel Piyasalar",
+  turkish_economy: "Türkiye Ekonomisi",
+  energy_markets: "Enerji Piyasaları",
   other: "Genel",
 };
+
+function getCategoryLabel(cat: string) {
+  if (categoryLabels[cat]) return categoryLabels[cat];
+  return cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function ProjectBlogPage() {
   const params = useParams<{ "project-slug": string }>();
@@ -84,7 +96,7 @@ export default function ProjectBlogPage() {
                   <div className="flex items-center gap-3 mb-3">
                     <span className="label text-muted text-[10px] bg-surface px-2.5 py-1 rounded flex items-center gap-1.5">
                       <Tag size={10} />
-                      {categoryLabels[article.category] ?? article.category}
+                      {getCategoryLabel(article.category)}
                     </span>
                     <span className="flex items-center gap-1.5 text-[12px] text-muted">
                       <Calendar size={12} />
