@@ -88,34 +88,79 @@ function toFilename(title: string): string {
     .slice(0, 60) || "article";
 }
 
-/* ─── DOCX export (pure HTML wrapped in Word-compatible format) ─── */
-function exportAsDocx(title: string, html: string) {
+/* ─── DOCX export (Word-compatible HTML with embedded images) ─── */
+async function exportAsDocx(title: string, html: string) {
+  // Convert external images to base64 for embedding in Word
+  const imgRegex = /<img[^>]*src="([^"]+)"[^>]*>/gi;
+  let processedHtml = html;
+  const imgMatches = [...html.matchAll(imgRegex)];
+
+  for (const match of imgMatches) {
+    const imgUrl = match[1];
+    if (imgUrl.startsWith("data:")) continue; // Already base64
+    try {
+      const response = await fetch(imgUrl);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      processedHtml = processedHtml.replace(imgUrl, base64);
+    } catch {
+      // Skip images that can't be fetched
+    }
+  }
+
+  // Constrain image sizes for Word
+  processedHtml = processedHtml.replace(
+    /<img([^>]*)>/gi,
+    '<img$1 style="max-width:500px;height:auto;display:block;margin:8pt 0" />'
+  );
+
+  // Remove float styles (Word doesn't handle CSS float well)
+  processedHtml = processedHtml.replace(/float:\s*(?:left|right);?/gi, "");
+
   const docContent = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office"
           xmlns:w="urn:schemas-microsoft-com:office:word"
           xmlns="http://www.w3.org/TR/REC-html40">
     <head>
       <meta charset="utf-8">
+      <!--[if gte mso 9]>
+      <xml>
+        <w:WordDocument>
+          <w:View>Print</w:View>
+          <w:Zoom>100</w:Zoom>
+          <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+      </xml>
+      <![endif]-->
       <style>
-        body { font-family: 'Calibri', sans-serif; font-size: 11pt; line-height: 1.6; color: #1a1a1a; max-width: 680px; margin: 0 auto; }
-        h1 { font-size: 22pt; font-weight: bold; margin-bottom: 12pt; color: #0d0f1a; }
-        h2 { font-size: 16pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; color: #0d0f1a; }
-        h3 { font-size: 13pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt; }
+        @page { size: A4; margin: 2.5cm; }
+        body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.6; color: #1a1a1a; }
+        h1 { font-size: 22pt; font-weight: bold; margin-bottom: 12pt; color: #0d0f1a; page-break-after: avoid; }
+        h2 { font-size: 16pt; font-weight: bold; margin-top: 18pt; margin-bottom: 8pt; color: #0d0f1a; page-break-after: avoid; }
+        h3 { font-size: 13pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt; page-break-after: avoid; }
         p { margin-bottom: 8pt; }
-        img { max-width: 100%; height: auto; }
-        blockquote { border-left: 3px solid #ccc; padding-left: 12pt; margin-left: 0; color: #555; font-style: italic; }
+        img { max-width: 500px; height: auto; }
+        blockquote { border-left: 3px solid #ccc; padding-left: 12pt; margin: 8pt 0; color: #555; font-style: italic; }
         code { font-family: 'Consolas', monospace; background: #f5f5f5; padding: 2pt 4pt; font-size: 10pt; }
         pre { font-family: 'Consolas', monospace; background: #f5f5f5; padding: 10pt; font-size: 10pt; white-space: pre-wrap; }
+        table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+        td, th { border: 1px solid #ddd; padding: 6pt 8pt; }
+        a { color: #0563C1; }
+        footer { margin-top: 24pt; padding-top: 12pt; border-top: 1px solid #ccc; }
       </style>
     </head>
     <body>
       <h1>${title}</h1>
-      ${html}
+      ${processedHtml}
     </body>
     </html>`;
 
-  const blob = new Blob([docContent], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  const blob = new Blob(['\ufeff' + docContent], {
+    type: "application/msword",
   });
   downloadBlob(blob, `${toFilename(title)}.doc`);
 }

@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,34 +8,54 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
 
-# misc
+# Misc
 .DS_Store
 *.pem
+Thumbs.db
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Environment variables
 .env*
+!.env.example
 
-# vercel
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel / Netlify
 .vercel
+.netlify
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
+# Agent / AI tooling (not part of product)
+.agent/
+.gemini/
+
+# Docker dev files
+Dockerfile
+.dockerignore
+docker+env.rar
+
+# Legacy docs (moved to README)
+AI_SYSTEM_README.md
+GUIDE.md

@@ -12,6 +12,7 @@ import { aiActions } from "./constants";
 import type { AIAction } from "./types";
 
 interface AIPanelProps {
+  projectSlug: string;
   open: boolean;
   onClose: () => void;
   language: "tr" | "en";
@@ -62,12 +63,7 @@ const SIZE_OPTIONS = [
   { key: "portrait" as const, label: "9:16" },
 ];
 
-const INITIAL_PERSONAS = [
-  { key: "philosopher_editor", label: "📝 Fulya", short: "Baş Editör" },
-  { key: "specialist", label: "🎓 Pedagog", short: "Uzman Pedagog" },
-  { key: "modern_guru", label: "⚡ Guru", short: "Modern Guru" },
-  { key: "news_anchor", label: "📊 Analist", short: "Sektör Analisti" },
-];
+const INITIAL_PERSONAS: { key: string; label: string; short: string }[] = [];
 
 /* ─── İnline style helpers (brand token CSS vars) ─── */
 const PANEL_BG: React.CSSProperties = { backgroundColor: "var(--color-brand-surface)" };
@@ -104,6 +100,7 @@ function SectionLabel({ icon: Icon, label, open, onToggle }: {
 }
 
 function PanelContent({
+  projectSlug,
   language,
   aiLoading, aiResult, setAiResult, bilingualResult,
   customPrompt, onCustomPromptChange, onCallAI, onApplyAIResult, onApplyBilingual,
@@ -124,23 +121,28 @@ function PanelContent({
   // Dynamic personas from API
   const [personaOptions, setPersonaOptions] = useState(INITIAL_PERSONAS);
   useEffect(() => {
-    fetch("/api/v1/admin/ai-personas")
+    fetch(`/api/v1/${projectSlug}/ai-personas`)
       .then((r) => r.json())
       .then((data) => {
         if (data.personas?.length > 0) {
-          setPersonaOptions(
-            data.personas
-              .filter((p: { is_active: boolean }) => p.is_active)
-              .map((p: { id: string; name: string }) => ({
-                key: p.id,
-                label: p.name,
-                short: p.name,
-              }))
-          );
+          const mapped = data.personas
+            .filter((p: { is_active: boolean }) => p.is_active)
+            .map((p: { id: string; name: string }) => ({
+              key: p.id,
+              label: p.name,
+              short: p.name,
+            }));
+          setPersonaOptions(mapped);
+          // Auto-select first persona if nothing is selected
+          if (mapped.length > 0 && (!selectedPersona || !mapped.some((m: { key: string }) => m.key === selectedPersona))) {
+            onPersonaChange(mapped[0].key);
+          }
         }
       })
       .catch(() => {});
-  }, []);
+    // selectedPersona and onPersonaChange intentionally excluded to avoid re-fetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectSlug]);
   // Collapsible section state
   const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({
     textOps: false,
@@ -222,15 +224,24 @@ function PanelContent({
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5 mb-2">
-          <input
-            type="text"
+        <div className="mb-2">
+          <textarea
             value={autoBlogTopic}
-            onChange={(e) => setAutoBlogTopic(e.target.value)}
-            placeholder="Blog konusu girin..."
-            className="input-boutique text-[12px] flex-1"
+            onChange={(e) => {
+              setAutoBlogTopic(e.target.value);
+              // Auto-grow
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
+            placeholder="Blog konusu girin... Detaylı prompt yazabilirsiniz."
+            className="input-boutique text-[12px] w-full resize-none overflow-hidden"
+            rows={2}
+            style={{ minHeight: "40px" }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && autoBlogTopic.trim()) onGenerateAutoBlog(autoBlogTopic);
+              if (e.key === "Enter" && !e.shiftKey && autoBlogTopic.trim()) {
+                e.preventDefault();
+                onGenerateAutoBlog(autoBlogTopic);
+              }
             }}
           />
         </div>
@@ -252,7 +263,7 @@ function PanelContent({
           style={BTN_FILLED}
         >
           {autoBlogLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
-          {autoBlogLoading ? "Oluşturuluyor..." : "🚀 Auto Blog Üret"}
+          {autoBlogLoading ? "Oluşturuluyor..." : "Auto Blog Üret"}
         </button>
         {autoBlogProgress && (
           <div className="mt-2 text-[10px] text-secondary font-medium flex items-center gap-1.5">

@@ -30,52 +30,64 @@ export interface AIPromptConfig {
   image_prompt: string;
 }
 
-let _cached: AIPromptConfig | null = null;
-let _cacheTime = 0;
+const _cache = new Map<string, { data: AIPromptConfig; time: number }>();
 const CACHE_TTL = 60_000; // 1 minute cache
 
 /**
  * Load AI prompt configuration from YAML file (fallback).
  */
-export function loadAIPromptsFromYAML(): AIPromptConfig {
-  const filePath = join(process.cwd(), "src", "config", "ai-prompts.yaml");
-  const raw = readFileSync(filePath, "utf-8");
-  return parse(raw) as AIPromptConfig;
+export function loadAIPromptsFromYAML(projectSlug: string = "music-blog"): AIPromptConfig {
+  let filePath = join(process.cwd(), "src", "config", `ai-prompts-${projectSlug}.yaml`);
+  try {
+    const raw = readFileSync(filePath, "utf-8");
+    return parse(raw) as AIPromptConfig;
+  } catch {
+    // If not found, default to music-blog just in case
+    filePath = join(process.cwd(), "src", "config", `ai-prompts-music-blog.yaml`);
+    const raw = readFileSync(filePath, "utf-8");
+    return parse(raw) as AIPromptConfig;
+  }
 }
 
 /**
  * Load AI prompt configuration from database, with YAML fallback.
  * Results are cached for 1 minute to avoid excessive DB calls.
  */
-export async function loadAIPromptsFromDB(): Promise<AIPromptConfig> {
+export async function loadAIPromptsFromDB(projectId: string): Promise<AIPromptConfig> {
   const now = Date.now();
-  if (_cached && now - _cacheTime < CACHE_TTL) return _cached;
+  const cached = _cache.get(projectId);
+  if (cached && now - cached.time < CACHE_TTL) return cached.data;
 
   try {
     const supabase = createAdminClient();
 
-    const [configRes, personasRes] = await Promise.all([
-      supabase.from("ai_config").select("*").eq("id", "default").single(),
+    const [projectRes, configRes, personasRes] = await Promise.all([
+      supabase.from("projects").select("slug").eq("id", projectId).single(),
+      supabase.from("project_ai_config").select("*").eq("project_id", projectId).single(),
       supabase
-        .from("ai_personas")
+        .from("project_personas")
         .select("*")
+        .eq("project_id", projectId)
         .eq("is_active", true)
         .order("sort_order", { ascending: true }),
     ]);
 
+    const projectSlug = projectRes.data?.slug || "music-blog";
+
     if (!configRes.data) {
       // DB not seeded yet, fall back to YAML
-      const yaml = loadAIPromptsFromYAML();
-      _cached = yaml;
-      _cacheTime = now;
+      const yaml = loadAIPromptsFromYAML(projectSlug);
+      _cache.set(projectId, { data: yaml, time: now });
       return yaml;
     }
 
     const config = configRes.data;
     const personas = personasRes.data ?? [];
 
-    // Build the same shape as the YAML config
-    const personasMap: Record<string, PersonaDefinition> = {};
+    // Fallback: start with YAML personas, then override with DB personas
+    const yamlFallback = loadAIPromptsFromYAML(projectSlug);
+    const personasMap: Record<string, PersonaDefinition> = { ...yamlFallback.personas };
+    
     for (const p of personas) {
       personasMap[p.id] = {
         name: p.name,
@@ -95,14 +107,13 @@ export async function loadAIPromptsFromDB(): Promise<AIPromptConfig> {
       image_prompt: config.image_prompt,
     };
 
-    _cached = result;
-    _cacheTime = now;
+    _cache.set(projectId, { data: result, time: now });
     return result;
   } catch {
     // DB error, fall back to YAML
-    const yaml = loadAIPromptsFromYAML();
-    _cached = yaml;
-    _cacheTime = now;
+    // Note: If DB error on getting slug, we'll probably just use the default music-blog
+    const yaml = loadAIPromptsFromYAML("music-blog");
+    _cache.set(projectId, { data: yaml, time: now });
     return yaml;
   }
 }
@@ -111,20 +122,23 @@ export async function loadAIPromptsFromDB(): Promise<AIPromptConfig> {
  * Load and cache AI prompt configuration.
  * Synchronous version — reads from YAML file (for backward compatibility).
  */
-export function loadAIPrompts(): AIPromptConfig {
-  if (_cached && Date.now() - _cacheTime < CACHE_TTL) return _cached;
-  const yaml = loadAIPromptsFromYAML();
-  _cached = yaml;
-  _cacheTime = Date.now();
+export function loadAIPrompts(projectSlug: string = "music-blog"): AIPromptConfig {
+  const cached = _cache.get(`yaml-${projectSlug}`);
+  if (cached && Date.now() - cached.time < CACHE_TTL) return cached.data;
+  const yaml = loadAIPromptsFromYAML(projectSlug);
+  _cache.set(`yaml-${projectSlug}`, { data: yaml, time: Date.now() });
   return yaml;
 }
 
 /**
  * Invalidate the cache so next call reloads from source.
  */
-export function invalidateAIPromptsCache(): void {
-  _cached = null;
-  _cacheTime = 0;
+export function invalidateAIPromptsCache(projectId?: string): void {
+  if (projectId) {
+    _cache.delete(projectId);
+  } else {
+    _cache.clear();
+  }
 }
 
 /**
@@ -135,9 +149,15 @@ export function getPersona(
   config?: AIPromptConfig
 ): PersonaDefinition & { id: string } {
   const c = config ?? loadAIPrompts();
+  const keys = Object.keys(c.personas);
+  const fallbackId = keys[0] ?? "default";
   const id =
-    personaId && c.personas[personaId] ? personaId : "philosopher_editor";
-  return { id, ...c.personas[id] };
+    personaId && c.personas[personaId] ? personaId : fallbackId;
+  const persona = c.personas[id];
+  if (!persona) {
+    return { id, name: "Default", tone: "", instruction: "" };
+  }
+  return { id, ...persona };
 }
 
 /**

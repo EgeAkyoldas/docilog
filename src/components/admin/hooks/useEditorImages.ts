@@ -4,18 +4,18 @@ import { useState, useRef, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import type { Lang } from "@/types";
 
-async function uploadFile(file: File): Promise<string | null> {
+async function uploadFile(file: File, projectSlug: string): Promise<string | null> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("folder", "content");
   try {
-    const res = await fetch("/api/v1/admin/upload", { method: "POST", body: formData });
+    const res = await fetch(`/api/v1/${projectSlug}/upload`, { method: "POST", body: formData });
     if (res.ok) { const data = await res.json(); return data.url as string; }
   } catch { /* fallthrough */ }
   return null;
 }
 
-export function useEditorImages(editor: Editor | null) {
+export function useEditorImages(projectSlug: string, editor: Editor | null) {
   // Per-language thumbnails
   const [thumbnails, setThumbnails] = useState<{ tr: string | null; en: string | null }>({
     tr: null, en: null,
@@ -41,12 +41,12 @@ export function useEditorImages(editor: Editor | null) {
       const file = e.target.files?.[0];
       if (!file) return;
       setUploading(true);
-      const url = await uploadFile(file);
+      const url = await uploadFile(file, projectSlug);
       if (url) setThumbnail(url, lang);
       setUploading(false);
       e.target.value = "";
     },
-    [setThumbnail]
+    [setThumbnail, projectSlug]
   );
 
   const handleContentImage = useCallback(
@@ -54,23 +54,23 @@ export function useEditorImages(editor: Editor | null) {
       const file = e.target.files?.[0];
       if (!file || !editor) return;
       setUploading(true);
-      const url = await uploadFile(file);
+      const url = await uploadFile(file, projectSlug);
       if (url) editor.chain().focus().setResizableImage({ src: url }).run();
       setUploading(false);
       e.target.value = "";
     },
-    [editor]
+    [editor, projectSlug]
   );
 
   const handleContentImageFile = useCallback(
     async (file: File) => {
       if (!file || !editor) return;
       setUploading(true);
-      const url = await uploadFile(file);
+      const url = await uploadFile(file, projectSlug);
       if (url) editor.chain().focus().setResizableImage({ src: url }).run();
       setUploading(false);
     },
-    [editor]
+    [editor, projectSlug]
   );
 
   return {

@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import type { Editor } from "@tiptap/react";
 import type { AIAction, ImageAspectRatio } from "@/types";
 
-export function useAIAssistant(editor: Editor | null) {
+export function useAIAssistant(projectSlug: string, editor: Editor | null) {
   const [aiOpen, setAiOpen] = useState(false);
 
   // Text AI
@@ -14,7 +14,7 @@ export function useAIAssistant(editor: Editor | null) {
   const [customPrompt, setCustomPrompt] = useState("");
 
   // Persona
-  const [selectedPersona, setSelectedPersona] = useState("philosopher_editor");
+  const [selectedPersona, setSelectedPersona] = useState("");
 
   // Image AI
   const [aiImageLoading, setAiImageLoading] = useState(false);
@@ -36,7 +36,7 @@ export function useAIAssistant(editor: Editor | null) {
       setAiResult(null);
       setBilingualResult(null);
       try {
-        const res = await fetch("/api/v1/admin/ai-assist", {
+        const res = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -61,7 +61,7 @@ export function useAIAssistant(editor: Editor | null) {
       } catch { setAiResult("⚠️ Bağlantı hatası."); }
       finally { setAiLoading(false); }
     },
-    [editor, customPrompt, selectedPersona]
+    [editor, customPrompt, selectedPersona, projectSlug]
   );
 
   const applyAIResult = useCallback((content?: string) => {
@@ -77,7 +77,7 @@ export function useAIAssistant(editor: Editor | null) {
   ) => {
     setAiImageLoading(true);
     try {
-      const res = await fetch("/api/v1/admin/ai-image", {
+      const res = await fetch(`/api/v1/${projectSlug}/ai-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -97,7 +97,7 @@ export function useAIAssistant(editor: Editor | null) {
       }
     } catch { /* ignore */ }
     finally { setAiImageLoading(false); }
-  }, [imagePromptText, aiImageSize]);
+  }, [imagePromptText, aiImageSize, projectSlug]);
 
   const insertImageIntoEditor = useCallback((url: string) => {
     if (!editor) return;
@@ -114,7 +114,7 @@ export function useAIAssistant(editor: Editor | null) {
     if (!editor) return;
     setAiImageLoading(true);
     try {
-      const res = await fetch("/api/v1/admin/ai-image", {
+      const res = await fetch(`/api/v1/${projectSlug}/ai-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -140,14 +140,14 @@ export function useAIAssistant(editor: Editor | null) {
       console.error("AI image insertion error:", err);
     }
     finally { setAiImageLoading(false); }
-  }, [editor, aiImageSize]);
+  }, [editor, aiImageSize, projectSlug]);
 
   const generateSEOMeta = useCallback(async (title: string) => {
     if (!editor) return;
     setSeoLoading(true);
     setSeoMeta(null);
     try {
-      const res = await fetch("/api/v1/admin/ai-assist", {
+      const res = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,7 +165,7 @@ export function useAIAssistant(editor: Editor | null) {
       }
     } catch { setSeoMeta("⚠️ Meta açıklama üretilemedi."); }
     finally { setSeoLoading(false); }
-  }, [editor]);
+  }, [editor, projectSlug]);
 
   const handleSEOOptimize = useCallback(async (
     issues: string,
@@ -177,7 +177,7 @@ export function useAIAssistant(editor: Editor | null) {
     setAiResult(null);
     setAiOpen(true);
     try {
-      const res = await fetch("/api/v1/admin/ai-assist", {
+      const res = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,7 +199,7 @@ export function useAIAssistant(editor: Editor | null) {
     } finally {
       setAiLoading(false);
     }
-  }, [editor]);
+  }, [editor, projectSlug]);
 
   // ── XML Hybrid Parser (V3) ──────────────────────────────────────────
   // Tries XML tag first, falls back to old regex for backward compatibility
@@ -270,7 +270,7 @@ export function useAIAssistant(editor: Editor | null) {
 
     try {
       // 1. Generate text via AI (with Google Search grounding)
-      const textRes = await fetch("/api/v1/admin/ai-assist", {
+      const textRes = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -322,6 +322,11 @@ export function useAIAssistant(editor: Editor | null) {
       if (onSetTitle) {
         setAutoBlogProgress("Başlık ayarlanıyor...");
         onSetTitle(articleTitle);
+      }
+
+      // 3a. Ensure H1 title exists in editor content
+      if (!html.match(/<h1[^>]*>/i)) {
+        html = `<h1>${articleTitle}</h1>\n` + html;
       }
 
       // 3b. Slug: XML first, then generate locally (no extra AI call!)
@@ -386,7 +391,7 @@ export function useAIAssistant(editor: Editor | null) {
         
         for (const src of parsedSources) {
           try {
-            const checkRes = await fetch(`/api/v1/admin/verify-url?url=${encodeURIComponent(src.url)}`, {
+            const checkRes = await fetch(`/api/v1/${projectSlug}/verify-url?url=${encodeURIComponent(src.url)}`, {
               signal: AbortSignal.timeout(5000),
             });
             const checkData = await checkRes.json();
@@ -432,52 +437,59 @@ export function useAIAssistant(editor: Editor | null) {
       console.log(`[Auto Blog] Found ${placeholders.length} image placeholders:`,
         placeholders.map(p => `${p.size}: ${p.desc.slice(0, 40)}`));
 
-      // 6. Generate images if enabled
+      // 6. Generate images if enabled — BATCH (parallel) generation
       if (autoBlogIncludeImages && placeholders.length > 0) {
+        setAutoBlogProgress(`Görseller üretiliyor (${placeholders.length} adet, paralel)...`);
         let firstImageUrl: string | null = null;
 
-        for (let i = 0; i < placeholders.length; i++) {
-          setAutoBlogProgress(
-            `Görsel üretiliyor (${i + 1}/${placeholders.length}) [${placeholders[i].size}]...`
-          );
-
-          try {
-            console.log(`[Auto Blog] Image ${i + 1} [${placeholders[i].size}]: "${placeholders[i].desc.slice(0, 60)}..."`);
-
-            const imgRes = await fetch("/api/v1/admin/ai-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                prompt: placeholders[i].desc,
-                articleSlug: slug || "untitled",
-                aspectRatio: placeholders[i].size,
-                articleTitle,
-                articleContext: `This image is part of #{i + 1} in an article titled "${articleTitle}". The article covers: ${topic}. Maintain visual consistency with other images in this series.`,
-              }),
-            });
-
-            if (imgRes.ok) {
-              const imgData = await imgRes.json();
-              if (imgData.url) {
-                console.log(`[Auto Blog] Image ${i + 1} OK`);
-                setGeneratedImages((prev) => [imgData.url, ...prev]);
-                const imgTag = buildImageHtml(imgData.url, placeholders[i].desc, placeholders[i].size, i);
-                html = html.replace(placeholders[i].full, imgTag);
-                if (!firstImageUrl) firstImageUrl = imgData.url;
-              } else {
-                console.warn(`[Auto Blog] Image ${i + 1}: no URL in response`);
-                html = html.replace(placeholders[i].full, "");
+        // Fire all image requests in parallel
+        const imagePromises = placeholders.map((ph, i) => {
+          console.log(`[Auto Blog] Image ${i + 1} [${ph.size}]: "${ph.desc.slice(0, 60)}..."`);
+          return fetch(`/api/v1/${projectSlug}/ai-image`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: ph.desc,
+              articleSlug: slug || "untitled",
+              aspectRatio: ph.size,
+              articleTitle,
+              articleContext: `Image #${i + 1} in article "${articleTitle}". Topic: ${topic}. Maintain visual consistency.`,
+            }),
+          })
+            .then(async (res) => {
+              if (!res.ok) {
+                console.error(`[Auto Blog] Image ${i + 1} failed: ${res.status}`);
+                return { index: i, url: null };
               }
-            } else {
-              const errText = await imgRes.text().catch(() => "unknown");
-              console.error(`[Auto Blog] Image ${i + 1} failed: ${imgRes.status}`, errText);
-              html = html.replace(placeholders[i].full, "");
-            }
-          } catch (err) {
-            console.error(`[Auto Blog] Image ${i + 1} exception:`, err);
-            html = html.replace(placeholders[i].full, "");
+              const data = await res.json();
+              if (data.url) {
+                console.log(`[Auto Blog] Image ${i + 1} OK`);
+                setGeneratedImages((prev) => [data.url, ...prev]);
+                return { index: i, url: data.url as string };
+              }
+              return { index: i, url: null };
+            })
+            .catch((err) => {
+              console.error(`[Auto Blog] Image ${i + 1} exception:`, err);
+              return { index: i, url: null };
+            });
+        });
+
+        const results = await Promise.all(imagePromises);
+
+        // Replace placeholders with generated images
+        for (const result of results) {
+          const ph = placeholders[result.index];
+          if (result.url) {
+            const imgTag = buildImageHtml(result.url, ph.desc, ph.size, result.index);
+            html = html.replace(ph.full, imgTag);
+            if (!firstImageUrl) firstImageUrl = result.url;
+          } else {
+            html = html.replace(ph.full, "");
           }
         }
+
+        setAutoBlogProgress(`${results.filter(r => r.url).length}/${placeholders.length} görsel üretildi`);
 
         // Set first image as cover
         if (firstImageUrl && onCoverImage) {
@@ -489,8 +501,12 @@ export function useAIAssistant(editor: Editor | null) {
         html = html.replace(/\[IMAGE:[^\]]*\]/gi, "");
       }
 
-      // 7. Add clearfix after floated images to prevent layout issues
-      html = html.replace(/<\/article>|$/, '<div style="clear:both"></div>');
+      // 7. Add clearfix after every section that may contain floated images
+      html = html.replace(/(<\/p>)(\s*<img[^>]*style="[^"]*float)/gi, '<div style="clear:both"></div>$1$2');
+      // Ensure final clearfix at the end of content
+      if (!html.endsWith('<div style="clear:both"></div>')) {
+        html += '<div style="clear:both"></div>';
+      }
 
       // 8. Apply to editor
       setAutoBlogProgress("Editöre uygulanıyor...");
@@ -505,7 +521,7 @@ export function useAIAssistant(editor: Editor | null) {
       } else {
         setAutoBlogProgress("SEO meta açıklaması üretiliyor...");
         try {
-          const metaRes = await fetch("/api/v1/admin/ai-assist", {
+          const metaRes = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -532,7 +548,7 @@ export function useAIAssistant(editor: Editor | null) {
       } else {
         setAutoBlogProgress("Anahtar kelimeler çıkarılıyor...");
         try {
-          const tagRes = await fetch("/api/v1/admin/ai-assist", {
+          const tagRes = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -558,7 +574,7 @@ export function useAIAssistant(editor: Editor | null) {
     } finally {
       setAutoBlogLoading(false);
     }
-  }, [editor, autoBlogIncludeImages, selectedPersona]);
+  }, [editor, autoBlogIncludeImages, selectedPersona, projectSlug]);
 
   // ─── Blog Ready: format existing content into blog structure ─────────────
   const generateBlogReady = useCallback(async (
@@ -630,6 +646,11 @@ export function useAIAssistant(editor: Editor | null) {
 
       if (onSetTitle) onSetTitle(articleTitle);
 
+      // 3a. Ensure H1 title exists in editor content
+      if (!html.match(/<h1[^>]*>/i)) {
+        html = `<h1>${articleTitle}</h1>\n` + html;
+      }
+
       // 3b. Slug: XML first, then local generation
       if (onSetSlug) {
         if (xmlSlug && xmlSlug.length > 3) {
@@ -685,7 +706,7 @@ export function useAIAssistant(editor: Editor | null) {
         const verifiedSources: { title: string; url: string; alive: boolean }[] = [];
         for (const src of parsedSources) {
           try {
-            const r = await fetch(`/api/v1/admin/verify-url?url=${encodeURIComponent(src.url)}`, { signal: AbortSignal.timeout(5000) });
+            const r = await fetch(`/api/v1/${projectSlug}/verify-url?url=${encodeURIComponent(src.url)}`, { signal: AbortSignal.timeout(5000) });
             const d = await r.json();
             verifiedSources.push({ ...src, alive: d.alive ?? false });
           } catch { verifiedSources.push({ ...src, alive: false }); }
@@ -698,49 +719,58 @@ export function useAIAssistant(editor: Editor | null) {
         html += `<footer class="article-references" style="margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--color-border)"><h3 style="font-size:16px;font-weight:600;margin-bottom:0.75rem">📚 Kaynaklar</h3><ol style="font-size:14px;line-height:1.8;padding-left:1.2rem;color:var(--color-secondary)">${sourceItems.join("\n")}</ol></footer>`;
       }
 
-      // 5. Generate images from placeholders
-      const placeholderRegex = /\[IMAGE:\s*([^\]|]+?)(?:\s*\|\s*SIZE:\s*(landscape|square|portrait))?\s*\]/gi;
+      // 5. Generate images from placeholders — BATCH (parallel)
+      const placeholderRegex2 = /\[IMAGE:\s*([^\]|]+?)(?:\s*\|\s*SIZE:\s*(landscape|square|portrait))?\s*\]/gi;
       const placeholders: { full: string; desc: string; size: string }[] = [];
-      const defaultSizes = ["landscape", "square", "portrait", "landscape"];
-      let match;
-      while ((match = placeholderRegex.exec(html)) !== null) {
-        const size = match[2]?.toLowerCase() || defaultSizes[placeholders.length % defaultSizes.length];
-        placeholders.push({ full: match[0], desc: match[1].trim(), size });
+      const defaultSizes2 = ["landscape", "square", "portrait", "landscape"];
+      let match2;
+      while ((match2 = placeholderRegex2.exec(html)) !== null) {
+        const size = match2[2]?.toLowerCase() || defaultSizes2[placeholders.length % defaultSizes2.length];
+        placeholders.push({ full: match2[0], desc: match2[1].trim(), size });
       }
 
       if (placeholders.length > 0) {
+        setAutoBlogProgress(`Görseller üretiliyor (${placeholders.length} adet, paralel)...`);
         let firstImageUrl: string | null = null;
-        for (let i = 0; i < placeholders.length; i++) {
-          setAutoBlogProgress(`Görsel üretiliyor (${i + 1}/${placeholders.length})...`);
-          try {
-            const imgRes = await fetch("/api/v1/admin/ai-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                prompt: placeholders[i].desc,
-                articleSlug: slug || "untitled",
-                aspectRatio: placeholders[i].size,
-                articleTitle,
-                articleContext: `Image ${i + 1} for blog-ready article "${articleTitle}". Maintain visual consistency.`,
-              }),
-            });
-            if (imgRes.ok) {
-              const imgData = await imgRes.json();
-              if (imgData.url) {
-                setGeneratedImages(prev => [imgData.url, ...prev]);
-                const imgTag = buildImageHtml(imgData.url, placeholders[i].desc, placeholders[i].size, i);
-                html = html.replace(placeholders[i].full, imgTag);
-                if (!firstImageUrl) firstImageUrl = imgData.url;
-              } else {
-                html = html.replace(placeholders[i].full, "");
+
+        const imagePromises = placeholders.map((ph, i) =>
+          fetch(`/api/v1/${projectSlug}/ai-image`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: ph.desc,
+              articleSlug: slug || "untitled",
+              aspectRatio: ph.size,
+              articleTitle,
+              articleContext: `Image ${i + 1} for blog-ready article "${articleTitle}". Maintain visual consistency.`,
+            }),
+          })
+            .then(async (res) => {
+              if (!res.ok) return { index: i, url: null };
+              const data = await res.json();
+              if (data.url) {
+                setGeneratedImages(prev => [data.url, ...prev]);
+                return { index: i, url: data.url as string };
               }
-            } else {
-              html = html.replace(placeholders[i].full, "");
-            }
-          } catch {
-            html = html.replace(placeholders[i].full, "");
+              return { index: i, url: null };
+            })
+            .catch(() => ({ index: i, url: null }))
+        );
+
+        const results = await Promise.all(imagePromises);
+
+        for (const result of results) {
+          const ph = placeholders[result.index];
+          if (result.url) {
+            const imgTag = buildImageHtml(result.url, ph.desc, ph.size, result.index);
+            html = html.replace(ph.full, imgTag);
+            if (!firstImageUrl) firstImageUrl = result.url;
+          } else {
+            html = html.replace(ph.full, "");
           }
         }
+
+        setAutoBlogProgress(`${results.filter(r => r.url).length}/${placeholders.length} görsel üretildi`);
 
         // Set first as cover
         if (firstImageUrl && onCoverImage) {
@@ -751,8 +781,11 @@ export function useAIAssistant(editor: Editor | null) {
         html = html.replace(/\[IMAGE:[^\]]*\]/gi, "");
       }
 
-      // 6. Apply to editor
-      html = html.replace(/<\/article>|$/, '<div style="clear:both"></div>');
+      // 6. Apply to editor with clearfix
+      html = html.replace(/(\<\/p>)(\s*<img[^>]*style="[^"]*float)/gi, '<div style="clear:both"></div>$1$2');
+      if (!html.endsWith('<div style="clear:both"></div>')) {
+        html += '<div style="clear:both"></div>';
+      }
       setAutoBlogProgress("Editöre uygulanıyor...");
       editor.commands.setContent(html);
 
@@ -764,7 +797,7 @@ export function useAIAssistant(editor: Editor | null) {
       } else {
         setAutoBlogProgress("SEO meta üretiliyor...");
         try {
-          const metaRes = await fetch("/api/v1/admin/ai-assist", {
+          const metaRes = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -788,7 +821,7 @@ export function useAIAssistant(editor: Editor | null) {
       } else {
         setAutoBlogProgress("Anahtar kelimeler çıkarılıyor...");
         try {
-          const tagRes = await fetch("/api/v1/admin/ai-assist", {
+          const tagRes = await fetch(`/api/v1/${projectSlug}/ai-assist`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -812,7 +845,7 @@ export function useAIAssistant(editor: Editor | null) {
     } finally {
       setAutoBlogLoading(false);
     }
-  }, [editor, selectedPersona]);
+  }, [editor, selectedPersona, projectSlug]);
 
   return {
     aiOpen, setAiOpen,

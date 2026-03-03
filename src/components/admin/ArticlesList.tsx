@@ -1,9 +1,22 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Plus, Trash2, Edit3, Eye, Calendar, CheckSquare, Square, FileType, Printer } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFileLines,
+  faPlus,
+  faTrashCan,
+  faPen,
+  faEye,
+  faCalendar,
+  faSquareCheck,
+  faSquare,
+  faFileWord,
+  faFilePdf,
+} from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
 
 interface Article {
@@ -62,9 +75,9 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-async function fetchArticleContent(id: string): Promise<{ title: string; content: string } | null> {
+async function fetchArticleContent(id: string, slug: string): Promise<{ title: string; content: string } | null> {
   try {
-    const res = await fetch(`/api/v1/admin/articles/${id}`);
+    const res = await fetch(`/api/v1/${slug}/articles/${id}`);
     if (!res.ok) return null;
     const data = await res.json();
     const tr = data.translations?.find((t: { language: string }) => t.language === "tr");
@@ -81,10 +94,13 @@ export function ArticlesList() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const params = useParams();
+  const slug = params["project-slug"] as string;
 
   const loadArticles = async () => {
+    if (!slug) return;
     try {
-      const res = await fetch("/api/v1/admin/articles");
+      const res = await fetch(`/api/v1/${slug}/articles`);
       if (res.ok) {
         const data = await res.json();
         setArticles(data.articles ?? []);
@@ -97,8 +113,8 @@ export function ArticlesList() {
   };
 
   useEffect(() => {
-    loadArticles();
-  }, []);
+    if (slug) loadArticles();
+  }, [slug]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -119,8 +135,9 @@ export function ArticlesList() {
         action: {
           label: "Evet, Sil",
           onClick: async () => {
+            if (!slug) return;
             try {
-              const res = await fetch(`/api/v1/admin/articles/${id}`, {
+              const res = await fetch(`/api/v1/${slug}/articles/${id}`, {
                 method: "DELETE",
               });
               if (res.ok) {
@@ -151,7 +168,8 @@ export function ArticlesList() {
 
     const contents: { title: string; content: string }[] = [];
     for (const id of selected) {
-      const article = await fetchArticleContent(id);
+      if (!slug) continue;
+      const article = await fetchArticleContent(id, slug);
       if (article) contents.push(article);
     }
 
@@ -244,13 +262,15 @@ export function ArticlesList() {
             Makaleler
           </h1>
         </div>
-        <Link
-          href="/admin/articles/new"
-          className="btn-primary no-underline flex items-center gap-2"
-        >
-          <Plus size={14} />
-          Yeni Makale
-        </Link>
+        {slug && (
+          <Link
+            href={`/${slug}/admin/articles/new`}
+            className="btn-primary no-underline flex items-center gap-2"
+          >
+            <FontAwesomeIcon icon={faPlus} className="fa-sm" />
+            Yeni Makale
+          </Link>
+        )}
       </motion.div>
 
       {/* Selection actions bar */}
@@ -279,21 +299,21 @@ export function ArticlesList() {
                 disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold micro-radius border border-border text-secondary hover:text-heading hover:border-heading transition-all disabled:opacity-40"
               >
-                <FileText size={13} /> MD
+                <FontAwesomeIcon icon={faFileLines} className="fa-sm" /> MD
               </button>
               <button
                 onClick={() => batchExport("doc")}
                 disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold micro-radius border border-border text-secondary hover:text-heading hover:border-heading transition-all disabled:opacity-40"
               >
-                <FileType size={13} /> DOC
+                <FontAwesomeIcon icon={faFileWord} className="fa-sm" /> DOC
               </button>
               <button
                 onClick={() => batchExport("pdf")}
                 disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold micro-radius border border-border text-secondary hover:text-heading hover:border-heading transition-all disabled:opacity-40"
               >
-                <Printer size={13} /> PDF
+                <FontAwesomeIcon icon={faFilePdf} className="fa-sm" /> PDF
               </button>
             </div>
           </motion.div>
@@ -308,15 +328,17 @@ export function ArticlesList() {
           animate={{ opacity: 1 }}
           className="card-boutique p-12 text-center"
         >
-          <FileText size={32} className="text-muted-slate mx-auto mb-4" strokeWidth={1} />
+          <FontAwesomeIcon icon={faFileLines} className="fa-2xl text-muted-slate mx-auto mb-4 block" />
           <p className="text-secondary text-[14px] mb-6">Henüz makale yok</p>
-          <Link
-            href="/admin/articles/new"
-            className="btn-primary no-underline inline-flex items-center gap-2"
-          >
-            <Plus size={14} />
-            İlk Makaleyi Oluştur
-          </Link>
+          {slug && (
+            <Link
+              href={`/${slug}/admin/articles/new`}
+              className="btn-primary no-underline inline-flex items-center gap-2"
+            >
+              <FontAwesomeIcon icon={faPlus} className="fa-sm" />
+              İlk Makaleyi Oluştur
+            </Link>
+          )}
         </motion.div>
       ) : (
         <motion.div
@@ -343,9 +365,9 @@ export function ArticlesList() {
                   title={isSelected ? "Seçimi kaldır" : "Seç"}
                 >
                   {isSelected ? (
-                    <CheckSquare size={18} className="text-deep-navy" />
+                    <FontAwesomeIcon icon={faSquareCheck} className="fa-lg text-deep-navy" />
                   ) : (
-                    <Square size={18} />
+                    <FontAwesomeIcon icon={faSquare} className="fa-lg" />
                   )}
                 </button>
 
@@ -364,7 +386,7 @@ export function ArticlesList() {
 
                   <div className="flex items-center gap-4 text-[12px] text-secondary">
                     <span className="flex items-center gap-1.5">
-                      <Calendar size={11} />
+                      <FontAwesomeIcon icon={faCalendar} className="fa-sm" />
                       {new Date(article.created_at).toLocaleDateString("tr-TR")}
                     </span>
                     <span className="flex items-center gap-1">
@@ -384,19 +406,19 @@ export function ArticlesList() {
 
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-4">
                   <Link
-                    href={`/blog/${article.slug}`}
+                    href={`/${slug}/blog/${article.slug}`}
                     target="_blank"
                     className="p-2 text-muted hover:text-deep-navy transition-colors no-underline"
                     title="Önizle"
                   >
-                    <Eye size={16} strokeWidth={1.5} />
+                    <FontAwesomeIcon icon={faEye} className="fa-sm" />
                   </Link>
                   <Link
-                    href={`/admin/articles/${article.id}/edit`}
+                    href={`/${slug}/admin/articles/${article.id}/edit`}
                     className="p-2 text-muted hover:text-deep-navy transition-colors no-underline"
                     title="Düzenle"
                   >
-                    <Edit3 size={16} strokeWidth={1.5} />
+                    <FontAwesomeIcon icon={faPen} className="fa-sm" />
                   </Link>
                   <button
                     onClick={() =>
@@ -408,7 +430,7 @@ export function ArticlesList() {
                     className="p-2 text-muted hover:text-red-500 transition-colors"
                     title="Sil"
                   >
-                    <Trash2 size={16} strokeWidth={1.5} />
+                    <FontAwesomeIcon icon={faTrashCan} className="fa-sm" />
                   </button>
                 </div>
               </div>

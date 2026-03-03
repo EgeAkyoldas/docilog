@@ -14,9 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Blog Yönetimi — Müzik Eğitimi",
+  title: {
+    template: "%s — Docilog",
+    default: "Docilog — AI Blog Platformu",
+  },
   description:
-    "Müzik eğitimi blog yönetim paneli. Makale oluşturma, düzenleme ve yayınlama.",
+    "Docilog: AI destekli çok-alanlı blog yönetim platformu.",
 };
 
 export default function RootLayout({

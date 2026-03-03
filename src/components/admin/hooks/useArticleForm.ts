@@ -12,7 +12,7 @@ function toSlug(value: string): string {
     .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export function useArticleForm(articleId: string | undefined, editor: Editor | null) {
+export function useArticleForm(articleId: string | undefined, projectSlug: string, editor: Editor | null) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [category, setCategory] = useState("other");
@@ -71,7 +71,7 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
     autoSaveTimerRef.current = setTimeout(async () => {
       const id = createdArticleIdRef.current;
       try {
-        const endpoint = id ? `/api/v1/admin/articles/${id}` : "/api/v1/admin/articles";
+        const endpoint = id ? `/api/v1/${projectSlug}/articles/${id}` : `/api/v1/${projectSlug}/articles`;
         const res = await fetch(endpoint, {
           method: id ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -95,14 +95,14 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [isDirty, editor, title, slug, category, language]);
+  }, [isDirty, editor, title, slug, category, language, projectSlug]);
 
   // Load existing article
   useEffect(() => {
     if (!articleId || !editor) return;
     async function loadArticle() {
       try {
-        const res = await fetch(`/api/v1/admin/articles/${articleId}`);
+        const res = await fetch(`/api/v1/${projectSlug}/articles/${articleId}`);
         if (!res.ok) return;
         const data = await res.json();
         const article = data.article;
@@ -139,7 +139,7 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
       } catch { /* silent */ }
     }
     loadArticle();
-  }, [articleId, editor]);
+  }, [articleId, editor, projectSlug]);
 
   const switchLanguage = useCallback((targetLang: Lang) => {
     if (targetLang === language || !editor) return;
@@ -189,7 +189,7 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
       ? metaDesc
       : translationCache.current[language].meta_description;
     try {
-      const endpoint = id ? `/api/v1/admin/articles/${id}` : "/api/v1/admin/articles";
+      const endpoint = id ? `/api/v1/${projectSlug}/articles/${id}` : `/api/v1/${projectSlug}/articles`;
       const res = await fetch(endpoint, {
         method: id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,7 +216,7 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
         const otherLang: Lang = language === "tr" ? "en" : "tr";
         const otherCache = translationCache.current[otherLang];
         if (effectiveId && otherCache.title.trim() && otherCache.content.trim()) {
-          await fetch(`/api/v1/admin/articles/${effectiveId}`, {
+          await fetch(`/api/v1/${projectSlug}/articles/${effectiveId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -246,7 +246,7 @@ export function useArticleForm(articleId: string | undefined, editor: Editor | n
     } finally {
       setSaving(false);
     }
-  }, [editor, title, slug, category, language]);
+  }, [editor, title, slug, category, language, projectSlug]);
 
   return {
     title, setTitle,

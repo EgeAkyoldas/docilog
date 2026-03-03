@@ -1,4 +1,5 @@
 "use client";
+import { useParams } from "next/navigation";
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -16,9 +17,8 @@ import { Youtube } from "./editor/extensions/YoutubeExtension";
 import { Video } from "./editor/extensions/VideoExtension";
 import { Audio } from "./editor/extensions/AudioExtension";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  Sparkles, Loader2, Expand, Shrink, HelpCircle, Keyboard
-} from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faWandMagicSparkles, faSpinner, faExpand, faCompress, faCircleQuestion, faKeyboard } from "@fortawesome/free-solid-svg-icons";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
@@ -74,7 +74,7 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
             Klavye Kısayolları
           </h2>
           <button onClick={onClose} className="text-charcoal/20 hover:text-charcoal/60">
-            <HelpCircle size={16} />
+            <FontAwesomeIcon icon={faCircleQuestion} className="w-4 h-4" />
           </button>
         </div>
         <div className="space-y-2">
@@ -131,13 +131,25 @@ export default function ArticleEditor({ articleId }: Props) {
     },
   });
 
-  const form = useArticleForm(articleId, editor);
-  const images = useEditorImages(editor);
-  const ai = useAIAssistant(editor);
+  const params = useParams();
+  const projectSlug = params["project-slug"] as string;
+
+  const form = useArticleForm(articleId, projectSlug, editor);
+  const {
+    getThumbnail,
+    setThumbnail,
+    uploading,
+    thumbnailRef,
+    imageRef,
+    handleThumbnailUpload,
+    handleContentImage,
+    handleContentImageFile,
+  } = useEditorImages(projectSlug, editor);
+  const ai = useAIAssistant(projectSlug, editor);
 
   // ── Derived state ─────────────────────────────────────────────
   // Read the active language's thumbnail (changes automatically when lang switches)
-  const activeThumbnail = images.getThumbnail(form.language);
+  const activeThumbnail = getThumbnail(form.language);
 
   // ── Global keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
@@ -164,8 +176,8 @@ export default function ArticleEditor({ articleId }: Props) {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith("image/")) return;
-    images.handleContentImageFile(file);
-  }, [images]);
+    handleContentImageFile(file);
+  }, [handleContentImageFile]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); }, []);
 
@@ -181,7 +193,7 @@ export default function ArticleEditor({ articleId }: Props) {
     formData.append("folder", type === "video" ? "videos" : "audio");
 
     try {
-      const res = await fetch("/api/v1/admin/upload", { method: "POST", body: formData });
+      const res = await fetch(`/api/v1/${projectSlug}/upload`, { method: "POST", body: formData });
       const data = await res.json();
 
       if (!res.ok) {
@@ -204,7 +216,7 @@ export default function ArticleEditor({ articleId }: Props) {
       console.error("[MediaUpload] Network error:", err);
       toast.error(`${label} yüklenirken bir hata oluştu`, { id: toastId });
     }
-  }, [editor]);
+  }, [editor, projectSlug]);
 
   // ── Character / word count ──────────────────────────────────────────────
   const characters = editor?.storage.characterCount.characters() ?? 0;
@@ -235,16 +247,16 @@ export default function ArticleEditor({ articleId }: Props) {
       {/* Focus mode exit hint */}
       {focusMode && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 text-[11px] text-charcoal/30 bg-soft-cream px-3 py-1.5 micro-radius">
-          <Shrink size={12} />
+          <FontAwesomeIcon icon={faCompress} className="w-3 h-3" />
           <kbd className="font-mono font-bold">Esc</kbd> odak modundan çık
         </div>
       )}
 
       <div className={`w-full ${mainContentMaxW}`}>
         {/* Hidden file inputs */}
-        <input ref={images.thumbnailRef} type="file" accept="image/*" className="hidden"
-          onChange={(e) => images.handleThumbnailUpload(e, form.language)} />
-        <input ref={images.imageRef} type="file" accept="image/*" className="hidden" onChange={images.handleContentImage} />
+        <input ref={thumbnailRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => handleThumbnailUpload(e, form.language)} />
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleContentImage} />
         <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleMediaUpload(f, "video"); e.target.value = ""; }} />
         <input ref={audioInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac" className="hidden"
@@ -262,9 +274,9 @@ export default function ArticleEditor({ articleId }: Props) {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {images.uploading && (
+              {uploading && (
                 <div className="flex items-center gap-2 text-secondary text-[12px]">
-                  <Loader2 size={14} className="animate-spin" /> Yükleniyor...
+                  <FontAwesomeIcon icon={faSpinner} className="animate-spin w-3.5 h-3.5" /> Yükleniyor...
                 </div>
               )}
 
@@ -286,13 +298,13 @@ export default function ArticleEditor({ articleId }: Props) {
               {/* Focus mode */}
               <button onClick={() => setFocusMode(true)} title="Odak Modu (F11)"
                 className="p-2 text-muted hover:text-heading transition-colors border border-border micro-radius">
-                <Expand size={14} />
+                <FontAwesomeIcon icon={faExpand} className="w-3.5 h-3.5" />
               </button>
 
               {/* Shortcuts */}
               <button onClick={() => setShowShortcuts(true)} title="Kısayollar (?)"
                 className="p-2 text-muted hover:text-heading transition-colors border border-border micro-radius">
-                <Keyboard size={14} />
+                <FontAwesomeIcon icon={faKeyboard} className="w-3.5 h-3.5" />
               </button>
 
               {/* Export dropdown */}
@@ -309,7 +321,7 @@ export default function ArticleEditor({ articleId }: Props) {
                     ? "bg-charcoal text-pure-white border-charcoal"
                     : "border-border text-secondary hover:text-heading hover:border-heading"
                 }`}>
-                <Sparkles size={13} />
+                <FontAwesomeIcon icon={faWandMagicSparkles} className="w-[13px] h-[13px]" />
                 AI
               </button>
             </div>
@@ -417,18 +429,18 @@ export default function ArticleEditor({ articleId }: Props) {
                           <img src={activeThumbnail} alt="Thumbnail" className="w-full h-full object-cover" />
                         </div>
                         <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => images.thumbnailRef.current?.click()}
+                          <button onClick={() => thumbnailRef.current?.click()}
                             className="text-[9px] font-bold px-1.5 py-0.5 bg-pure-white/90 border border-muted-slate micro-radius hover:bg-deep-navy hover:text-pure-white hover:border-deep-navy transition-all">
                             Değiştir
                           </button>
-                          <button onClick={() => images.setThumbnail(null, form.language)}
+                          <button onClick={() => setThumbnail(null, form.language)}
                             className="text-[9px] font-bold px-1.5 py-0.5 bg-pure-white/90 border border-muted-slate micro-radius hover:bg-rose-500 hover:text-pure-white hover:border-rose-500 transition-all">
                             Kaldır
                           </button>
                         </div>
                       </div>
                     ) : (
-                      <button onClick={() => images.thumbnailRef.current?.click()}
+                      <button onClick={() => thumbnailRef.current?.click()}
                         className="w-full aspect-[4/3] border-2 border-dashed border-border micro-radius text-muted hover:border-heading hover:text-heading hover:bg-surface-overlay transition-all flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold tracking-wider">
                         {form.language.toUpperCase()} kapak
                         <span className="text-[9px] font-normal opacity-50">Yükle veya AI ile üret</span>
@@ -448,7 +460,7 @@ export default function ArticleEditor({ articleId }: Props) {
               {viewMode === "edit" && editor && (
                 <EditorToolbar
                   editor={editor}
-                  imageRef={images.imageRef}
+                  imageRef={imageRef}
                   videoRef={videoInputRef}
                   audioRef={audioInputRef}
                   aiImageLoading={ai.aiImageLoading}
@@ -476,7 +488,8 @@ export default function ArticleEditor({ articleId }: Props) {
                 ref={editorAreaRef}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="relative"
+                className="relative overflow-y-auto"
+                style={{ maxHeight: "calc(100vh - 280px)" }}
               >
                 {viewMode === "edit" ? (
                   <div className="mt-3" style={{ fontFamily: "var(--font-body)", lineHeight: "1.8" }}>
@@ -514,6 +527,7 @@ export default function ArticleEditor({ articleId }: Props) {
 
           {/* Right: AI Panel */}
           <AIPanel
+            projectSlug={projectSlug}
             open={ai.aiOpen}
             onClose={() => ai.setAiOpen(false)}
             language={form.language}
@@ -532,12 +546,12 @@ export default function ArticleEditor({ articleId }: Props) {
             imageSize={ai.aiImageSize}
             onImageSizeChange={ai.setAiImageSize}
             onGenerateCoverImage={() =>
-              ai.generateAIImage(form.title, form.slug, (url) => images.setThumbnail(url, form.language))
+              ai.generateAIImage(form.title, form.slug, (url) => setThumbnail(url, form.language))
             }
             onOpenContentImagePrompt={() => ai.insertAIImage(ai.imagePromptText || form.title, form.slug)}
             generatedImages={ai.generatedImages}
             onInsertImage={ai.insertImageIntoEditor}
-            onSetAsCover={(url) => images.setThumbnail(url, form.language)}
+            onSetAsCover={(url) => setThumbnail(url, form.language)}
             seoMeta={ai.seoMeta}
             seoLoading={ai.seoLoading}
             onGenerateSEO={() => ai.generateSEOMeta(form.title)}
@@ -556,7 +570,7 @@ export default function ArticleEditor({ articleId }: Props) {
                 topic,
                 form.slug,
                 form.language,
-                (url) => images.setThumbnail(url, form.language),
+                (url) => setThumbnail(url, form.language),
                 form.autoSlug,
                 form.setCategory,
                 form.setSlug,
@@ -569,7 +583,7 @@ export default function ArticleEditor({ articleId }: Props) {
               ai.generateBlogReady(
                 form.slug,
                 form.language,
-                (url) => images.setThumbnail(url, form.language),
+                (url) => setThumbnail(url, form.language),
                 form.autoSlug,
                 form.setCategory,
                 form.setSlug,
