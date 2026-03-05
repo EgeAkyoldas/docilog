@@ -75,6 +75,13 @@ export default async function AdminLayout({
             <FontAwesomeIcon icon={faPenFancy} className="fa-sm w-4" />
             Yeni Makale
           </Link>
+          <Link
+            href={`/${slug}/admin/campaigns`}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] font-medium text-secondary hover:text-heading hover:bg-surface transition-all no-underline"
+          >
+            <span className="w-4 text-center text-[13px]">📱</span>
+            Kampanyalar
+          </Link>
 
           <div className="label text-muted px-3 mb-2 mt-6">AYARLAR</div>
           <Link

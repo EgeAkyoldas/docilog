@@ -208,6 +208,49 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
     return xmlMatch ? xmlMatch[1].trim() : '';
   };
 
+  // ── Markdown-to-HTML safety net ──────────────────────────────────────
+  // If AI returns markdown instead of HTML, convert it to proper HTML
+  const markdownToHtml = (text: string): string => {
+    // Skip if content already has HTML tags (it's proper HTML)
+    if (/<(h[1-6]|p|div|ul|ol|li|strong|em|blockquote|table|img|a)\b/i.test(text)) {
+      return text;
+    }
+
+    let html = text;
+
+    // Headers
+    html = html.replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>');
+
+    // Bold + Italic
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Unordered lists
+    html = html.replace(/^[\-\*•]\s+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
+
+    // Ordered lists
+    html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+    // Paragraphs — wrap remaining text blocks
+    html = html.replace(/\n\n+/g, '</p><p>');
+    html = html.replace(/^(?!<[hupola])/gm, '');
+
+    // Wrap in p if not starting with a tag
+    if (!html.startsWith('<')) html = `<p>${html}</p>`;
+
+    // Clean up empty paragraphs
+    html = html.replace(/<p>\s*<\/p>/g, '');
+
+    return html;
+  };
+
   // Strip all XML wrapper tags from content, leaving only inner HTML
   const stripXMLWrappers = (html: string): string => {
     let result = html;
@@ -215,9 +258,17 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
     result = result.replace(/<meta_data>[\s\S]*?<\/meta_data>/gi, '');
     // Remove <ref_links>...</ref_links> block entirely  
     result = result.replace(/<ref_links>[\s\S]*?<\/ref_links>/gi, '');
+    // Remove <visual_prompts>...</visual_prompts> block entirely
+    result = result.replace(/<visual_prompts>[\s\S]*?<\/visual_prompts>/gi, '');
+    // Remove <article_body_en>...</article_body_en> (English version, store separately if needed)
+    result = result.replace(/<article_body_en>[\s\S]*?<\/article_body_en>/gi, '');
     // Extract content from <article_body> if present
     const bodyMatch = result.match(/<article_body>([\s\S]*?)<\/article_body>/i);
     if (bodyMatch) result = bodyMatch[1].trim();
+
+    // Safety net: convert any remaining markdown to HTML
+    result = markdownToHtml(result);
+
     return result;
   };
 
@@ -261,8 +312,10 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
     onSetCategory?: (cat: string) => void,
     onSetSlug?: (slug: string) => void,
     onSetMetaDescription?: (text: string) => void,
+    referenceImages?: string[],
+    onDraftSave?: () => void, // Added onDraftSave parameter
   ) => {
-    if (!editor || !topic.trim()) return;
+    if (!editor) return;
     setAutoBlogLoading(true);
     setAutoBlogProgress("Kaynak araştırılıyor ve makale oluşturuluyor...");
     setAiOpen(true);
@@ -278,6 +331,7 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
           title: topic,
           language,
           persona: selectedPersona,
+          referenceImages: referenceImages || undefined,
         }),
       });
 
@@ -290,6 +344,7 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
       }
 
       const textData = await textRes.json();
+      console.log(`[INDEX-14] generateAutoBlog AI request succeeded.`);
       let html: string = textData.result || "";
       const groundingChunks: { url: string; title: string }[] = textData.groundingChunks || [];
 
@@ -512,6 +567,13 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
       setAutoBlogProgress("Editöre uygulanıyor...");
       editor.commands.setContent(html);
 
+      // Automatically save draft after generation so user doesn't lose it
+      if (onDraftSave) {
+        console.log(`[INDEX-15] generateAutoBlog calling onDraftSave()`);
+        // Wait for a tick to ensure React state has updated the editor content
+        setTimeout(() => onDraftSave(), 100);
+      }
+
       // 9. SEO meta: XML first, fallback to AI call
       if (xmlMeta && xmlMeta.length > 10) {
         const cleanMeta = xmlMeta.replace(/<[^>]*>/g, "").trim().slice(0, 160);
@@ -569,10 +631,11 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
 
       setAutoBlogProgress("");
     } catch (err) {
-      console.error("[Auto Blog] Fatal error:", err);
+      console.error("[INDEX-16] generateAutoBlog Error generating article:", err);
       setAutoBlogProgress("⚠️ Auto Blog başarısız oldu.");
     } finally {
       setAutoBlogLoading(false);
+      setAutoBlogProgress("");
     }
   }, [editor, autoBlogIncludeImages, selectedPersona, projectSlug]);
 

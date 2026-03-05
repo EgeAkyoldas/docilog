@@ -235,6 +235,80 @@ body {
 }
 .panel-btn:hover { background: var(--color-brand-primary-hover, rgba(0,0,0,0.8)); }
 
+/* ─── AI Chat Message Styles ─────────────────────────────── */
+.chat-message-content {
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.chat-message-content p { margin: 0 0 0.5em 0; }
+.chat-message-content p:last-child { margin-bottom: 0; }
+.chat-message-content strong { font-weight: 700; }
+.chat-message-content em { font-style: italic; }
+.chat-code-block {
+  background: var(--color-surface-raised);
+  padding: 0.625rem 0.75rem;
+  border-radius: 6px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 0.5em 0;
+  white-space: pre-wrap;
+}
+.chat-inline-code {
+  background: var(--color-surface-raised);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.9em;
+}
+.chat-h2 { font-size: 14px; font-weight: 700; margin: 0.75em 0 0.25em; }
+.chat-h3 { font-size: 13px; font-weight: 700; margin: 0.5em 0 0.25em; }
+.chat-h4 { font-size: 12px; font-weight: 700; margin: 0.5em 0 0.25em; }
+.chat-ul, .chat-ol { padding-left: 1.25em; margin: 0.25em 0; }
+.chat-ul { list-style-type: disc; }
+.chat-ol { list-style-type: decimal; }
+.chat-li, .chat-oli { margin: 0.15em 0; line-height: 1.6; }
+
+/* Prompt section labels */
+.chat-prompt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0.5em 0 0.25em;
+}
+.chat-prompt-icon { font-size: 11px; }
+.chat-prompt-image {
+  background: rgba(42, 157, 143, 0.12);
+  color: #2a9d8f;
+  border: 1px solid rgba(42, 157, 143, 0.25);
+}
+.chat-prompt-video {
+  background: rgba(230, 126, 34, 0.12);
+  color: #e67e22;
+  border: 1px solid rgba(230, 126, 34, 0.25);
+}
+.chat-prompt-content {
+  background: rgba(39, 174, 96, 0.12);
+  color: #27ae60;
+  border: 1px solid rgba(39, 174, 96, 0.25);
+}
+.chat-prompt-tr {
+  background: rgba(231, 76, 60, 0.10);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.20);
+}
+.chat-prompt-en {
+  background: rgba(52, 152, 219, 0.10);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.20);
+}
 /* ─── TipTap Editor ──────────────────────────────────────── */
 .ProseMirror {
   outline: none;

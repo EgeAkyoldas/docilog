@@ -26,13 +26,16 @@ interface AIRequest {
     | "bilingual"
     | "seo-optimize"
     | "auto_blog"
-    | "blog_ready";
+    | "blog_ready"
+    | "chat";
   content?: string;
   title?: string;
   language?: string;
   prompt?: string;
   seoIssues?: string;
   persona?: string;
+  history?: { role: string; content: string }[];
+  referenceImages?: string[];
 }
 
 // Dynamic temperature: analytical tasks low, creative tasks high
@@ -45,6 +48,7 @@ const TEMPERATURE_MAP: Record<string, number> = {
   expand: 0.7,
   bilingual: 0.7,
   custom: 0.7,
+  chat: 0.7,
   generate: 0.85,
   auto_blog: 0.85,
 };
@@ -111,6 +115,82 @@ function buildPrompt(
   return data.prompt || "";
 }
 
+/**
+ * Build multi-turn contents array for chat mode.
+ * Gemini expects alternating user/model messages.
+ */
+function buildChatContents(
+  data: AIRequest,
+  _config: AIPromptConfig
+): { role: string; parts: { text: string }[] }[] {
+  const lang = data.language === "en" ? "English" : "Türkçe";
+
+  // Build initial context message with document content
+  const contextParts: string[] = [
+    `[DOCUMENT CONTEXT — EDITING MODE]`,
+    `Title: ${data.title || "(untitled)"}`,
+    `Language: ${lang}`,
+    `\nDocument Content:\n${data.content || "(empty document)"}`,
+  ];
+
+  // Reference images
+  if (data.referenceImages?.length) {
+    contextParts.push(`\nReference Images: ${data.referenceImages.join(", ")}`);
+  }
+
+  contextParts.push(`\n[USER MESSAGE]\n${data.prompt || ""}`);
+
+  // Build multi-turn contents
+  const contents: { role: string; parts: { text: string }[] }[] = [];
+
+  // If there's history, include previous turns
+  if (data.history && data.history.length > 1) {
+    // First message gets the document context injected
+    for (let i = 0; i < data.history.length; i++) {
+      const msg = data.history[i];
+      const role = msg.role === "user" ? "user" : "model";
+
+      if (i === 0 && role === "user") {
+        // Inject doc context into first user message
+        contents.push({
+          role: "user",
+          parts: [{ text: `${contextParts.join("\n")}\n\n(Note: Document context is provided above for reference.)` }],
+        });
+      } else if (i === data.history.length - 1 && role === "user") {
+        // Last user message = current question with fresh context
+        contents.push({
+          role: "user",
+          parts: [{ text: `[CURRENT DOCUMENT STATE]\n${data.content || ""}\n\n[USER]\n${msg.content}` }],
+        });
+      } else {
+        contents.push({
+          role,
+          parts: [{ text: msg.content }],
+        });
+      }
+    }
+  } else {
+    // Single message — use full context
+    contents.push({
+      role: "user",
+      parts: [{ text: contextParts.join("\n") }],
+    });
+  }
+
+  // Ensure contents alternate user/model (Gemini requirement)
+  // If two consecutive same-role messages exist, merge them
+  const merged: typeof contents = [];
+  for (const c of contents) {
+    if (merged.length > 0 && merged[merged.length - 1].role === c.role) {
+      merged[merged.length - 1].parts[0].text += "\n\n" + c.parts[0].text;
+    } else {
+      merged.push(c);
+    }
+  }
+
+  return merged;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ "project-slug": string }> }
@@ -154,7 +234,9 @@ export async function POST(
     // Build request body
     const geminiBody: Record<string, unknown> = {
       system_instruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: body.action === "chat"
+        ? buildChatContents(body, config)
+        : [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: TEMPERATURE_MAP[actionKey] ?? 0.7,
         topP: 0.9,
@@ -168,29 +250,59 @@ export async function POST(
     }
 
     const FALLBACK_MODEL = "gemini-2.5-flash";
+    const PRIMARY_TIMEOUT_MS = 30_000; // 30 seconds
 
-    // Helper: call Gemini with a specific model
-    async function callGemini(targetModel: string) {
-      return fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(geminiBody),
-        }
-      );
+    // Helper: call Gemini with a specific model + optional timeout
+    async function callGemini(targetModel: string, timeoutMs?: number) {
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      if (timeoutMs) {
+        timer = setTimeout(() => controller.abort(), timeoutMs);
+      }
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geminiBody),
+            signal: controller.signal,
+          }
+        );
+        if (timer) clearTimeout(timer);
+        return response;
+      } catch (err) {
+        if (timer) clearTimeout(timer);
+        throw err;
+      }
     }
 
-    // Try primary model first
-    let res = await callGemini(model);
+    // Try primary model with 30s timeout
+    let res: Response;
     let usedModel = model;
 
-    // Fallback on 502, 503, 429 (rate limit), or 404 (model not found)
-    if (!res.ok && [502, 503, 429, 404].includes(res.status) && model !== FALLBACK_MODEL) {
-      const primaryErr = await res.text();
-      console.warn(`[AI] Primary model ${model} failed (${res.status}), falling back to ${FALLBACK_MODEL}`, primaryErr);
-      res = await callGemini(FALLBACK_MODEL);
-      usedModel = FALLBACK_MODEL;
+    try {
+      res = await callGemini(model, model !== FALLBACK_MODEL ? PRIMARY_TIMEOUT_MS : undefined);
+
+      // Fallback on HTTP errors (502, 503, 429, 404)
+      if (!res.ok && [502, 503, 429, 404].includes(res.status) && model !== FALLBACK_MODEL) {
+        const primaryErr = await res.text();
+        console.warn(`[AI] Primary model ${model} failed (${res.status}), falling back to ${FALLBACK_MODEL}`, primaryErr);
+        res = await callGemini(FALLBACK_MODEL);
+        usedModel = FALLBACK_MODEL;
+      }
+    } catch (err) {
+      // Timeout or network error on primary → fallback
+      if (model !== FALLBACK_MODEL) {
+        const reason = (err as Error).name === "AbortError" ? "timeout (30s)" : (err as Error).message;
+        console.warn(`[AI] Primary model ${model} ${reason}, falling back to ${FALLBACK_MODEL}`);
+        res = await callGemini(FALLBACK_MODEL);
+        usedModel = FALLBACK_MODEL;
+      } else {
+        throw err;
+      }
     }
 
     if (!res.ok) {

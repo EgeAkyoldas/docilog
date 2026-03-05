@@ -25,6 +25,10 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
   const [isDirty, setIsDirty] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    console.log("[INDEX-1] useArticleForm mounted/updated. Current articleId prop:", articleId, "Ref:", createdArticleIdRef.current);
+  }, [articleId]);
+
   // Track the effective article ID — undefined for new, set after first POST
   const createdArticleIdRef = useRef<string | undefined>(articleId);
 
@@ -70,6 +74,7 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
 
     autoSaveTimerRef.current = setTimeout(async () => {
       const id = createdArticleIdRef.current;
+      console.log(`[INDEX-2] Auto-save triggered. ID: ${id}, Title: ${title}`);
       try {
         const endpoint = id ? `/api/v1/${projectSlug}/articles/${id}` : `/api/v1/${projectSlug}/articles`;
         const res = await fetch(endpoint, {
@@ -84,7 +89,12 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
         if (res.ok) {
           if (!id) {
             const data = await res.json().catch(() => null);
-            if (data?.article?.id) createdArticleIdRef.current = data.article.id;
+            if (data?.article?.id) {
+              console.log(`[INDEX-3] Auto-save created NEW article with ID: ${data.article.id}`);
+              createdArticleIdRef.current = data.article.id;
+            }
+          } else {
+            console.log(`[INDEX-4] Auto-save updated existing article ID: ${id}`);
           }
           setLastSavedAt(new Date());
           setIsDirty(false);
@@ -136,8 +146,11 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
           if (active.content && editor) editor.commands.setContent(active.content);
         }
         setIsDirty(false);
-      } catch { /* silent */ }
+      } catch (err) { 
+        console.error("[INDEX-6] loadArticle failed:", err);
+      }
     }
+    console.log("[INDEX-5] Attempting to load existing article ID:", articleId);
     loadArticle();
   }, [articleId, editor, projectSlug]);
 
@@ -170,11 +183,13 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
     const effectiveTitle = title.trim()
       || translationCache.current[language === "en" ? "tr" : "en"].title.trim();
     if (!id && !effectiveTitle) {
+      console.log("[INDEX-7] handleSave aborted: no title and no idea.");
       setSaveError("Kaydetmek için önce bir başlık girin.");
       return;
     }
     const titleToSend = title.trim() || effectiveTitle;
 
+    console.log(`[INDEX-8] handleSave started. ID: ${id}, Status: ${status}`);
     setSaving(true);
     setSaveError(null);
 
@@ -207,9 +222,12 @@ export function useArticleForm(articleId: string | undefined, projectSlug: strin
         if (!id) {
           const data = await res.json().catch(() => null);
           if (data?.article?.id) {
+            console.log(`[INDEX-9] handleSave created NEW article with ID: ${data.article.id}`);
             createdArticleIdRef.current = data.article.id;
             effectiveId = data.article.id;
           }
+        } else {
+          console.log(`[INDEX-10] handleSave updated existing article ID: ${id}`);
         }
 
         // Save the OTHER language too if it has content

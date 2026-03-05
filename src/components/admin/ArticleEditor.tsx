@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useArticleForm } from "./hooks/useArticleForm";
 import { useEditorImages } from "./hooks/useEditorImages";
 import { useAIAssistant } from "./hooks/useAIAssistant";
+import { useAIChat } from "./hooks/useAIChat";
 
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { AIImagePromptBar } from "./editor/AIImagePromptBar";
@@ -134,6 +135,8 @@ export default function ArticleEditor({ articleId }: Props) {
   const params = useParams();
   const projectSlug = params["project-slug"] as string;
 
+  console.log(`[INDEX-13] Rendering ArticleEditor. Prop articleId=${articleId}, Slug=${projectSlug}`);
+
   const form = useArticleForm(articleId, projectSlug, editor);
   const {
     getThumbnail,
@@ -146,6 +149,8 @@ export default function ArticleEditor({ articleId }: Props) {
     handleContentImageFile,
   } = useEditorImages(projectSlug, editor);
   const ai = useAIAssistant(projectSlug, editor);
+  const chat = useAIChat(projectSlug, editor);
+  const [aiPanelMode, setAiPanelMode] = useState<"assistant" | "chat">("assistant");
 
   // ── Derived state ─────────────────────────────────────────────
   // Read the active language's thumbnail (changes automatically when lang switches)
@@ -565,7 +570,7 @@ export default function ArticleEditor({ articleId }: Props) {
             autoBlogProgress={ai.autoBlogProgress}
             autoBlogIncludeImages={ai.autoBlogIncludeImages}
             onAutoBlogIncludeImagesChange={ai.setAutoBlogIncludeImages}
-            onGenerateAutoBlog={(topic) =>
+            onGenerateAutoBlog={(topic, referenceImages) =>
               ai.generateAutoBlog(
                 topic,
                 form.slug,
@@ -575,6 +580,7 @@ export default function ArticleEditor({ articleId }: Props) {
                 form.setCategory,
                 form.setSlug,
                 (text) => form.setMetaDescription(text, form.language),
+                referenceImages,
               )
             }
             autoTags={ai.autoTags}
@@ -592,6 +598,21 @@ export default function ArticleEditor({ articleId }: Props) {
             }
             selectedPersona={ai.selectedPersona}
             onPersonaChange={ai.setSelectedPersona}
+            panelMode={aiPanelMode}
+            onPanelModeChange={setAiPanelMode}
+            chatMessages={chat.messages}
+            chatInput={chat.inputValue}
+            chatStreaming={chat.isStreaming}
+            chatAttachedImages={chat.attachedImages}
+            chatScrollRef={chat.scrollRef}
+            onChatSend={(text) => chat.sendMessage(text, form.title, form.language, ai.selectedPersona)}
+            onChatInputChange={chat.setInputValue}
+            onChatPaste={chat.handlePaste}
+            onChatRemoveImage={chat.removeAttachedImage}
+            onChatGenerateImage={(prompt) => chat.generateImage(prompt, form.slug)}
+            onChatInsertToEditor={chat.insertImageToEditor}
+            onChatApplyEdit={chat.applyEdit}
+            onChatClearHistory={chat.clearHistory}
           />
         </div>
 

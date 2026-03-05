@@ -40,11 +40,19 @@ const MOCK_USERS: AuthUser[] = [
     role: "project_user",
     avatar_url: null,
   },
+  {
+    id: "00000000-0000-0000-0000-000000000003",
+    username: "boterma",
+    display_name: "Aura (Boterma)",
+    role: "project_user",
+    avatar_url: null,
+  },
 ];
 
 const PRESET_CREDENTIALS: Record<string, string> = {
   "admin": "docilog123",
   "cenk": "cenk123",
+  "boterma": "boterma123",
 };
 
 /* ── Login ── */
@@ -127,6 +135,9 @@ export async function checkProjectAccess(
 
   // Cenk only has access to finance-blog
   if (user.username === "cenk" && projectSlug === "finance-blog") return true;
+
+  // Boterma/Aura has access to boterma-social
+  if (user.username === "boterma" && projectSlug === "boterma-social") return true;
 
   return false;
 }

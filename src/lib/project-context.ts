@@ -69,19 +69,44 @@ let MOCK_PROJECTS: ProjectWithDetails[] = [
       { id: "cat5", project_id: "20000000-0000-0000-0000-000000000001", slug: "macro_economics", label: "Makroekonomi", sort_order: 1, is_active: true },
       { id: "cat6", project_id: "20000000-0000-0000-0000-000000000001", slug: "morning_brief", label: "Güne Başlarken", sort_order: 2, is_active: true },
     ]
+  },
+  {
+    id: "30000000-0000-0000-0000-000000000001",
+    slug: "boterma-social",
+    name: "Boterma Social Media",
+    description: "Boterma iç mekan aydınlatma markası için sosyal medya içerik üretim platformu",
+    icon: "💡",
+    theme_config: {},
+    owner_id: "00000000-0000-0000-0000-000000000001",
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    article_count: 0,
+    categories: [
+      { id: "cat7", project_id: "30000000-0000-0000-0000-000000000001", slug: "instagram_post", label: "Instagram Post", sort_order: 0, is_active: true },
+      { id: "cat8", project_id: "30000000-0000-0000-0000-000000000001", slug: "stories", label: "Story İçerikleri", sort_order: 1, is_active: true },
+      { id: "cat9", project_id: "30000000-0000-0000-0000-000000000001", slug: "campaign", label: "Kampanya", sort_order: 2, is_active: true },
+      { id: "cat10", project_id: "30000000-0000-0000-0000-000000000001", slug: "product_showcase", label: "Ürün Tanıtımı", sort_order: 3, is_active: true },
+      { id: "cat11", project_id: "30000000-0000-0000-0000-000000000001", slug: "collection_lookbook", label: "Koleksiyon & Lookbook", sort_order: 4, is_active: true },
+      { id: "cat12", project_id: "30000000-0000-0000-0000-000000000001", slug: "trend_inspiration", label: "Trend & İlham", sort_order: 5, is_active: true },
+      { id: "cat13", project_id: "30000000-0000-0000-0000-000000000001", slug: "behind_the_scenes", label: "Sahne Arkası", sort_order: 6, is_active: true },
+      { id: "cat14", project_id: "30000000-0000-0000-0000-000000000001", slug: "other", label: "Genel", sort_order: 7, is_active: true },
+    ]
   }
 ];
 
 const MOCK_MEMBERS = {
   // user IDs
   "admin": "00000000-0000-0000-0000-000000000001",
-  "cenk": "00000000-0000-0000-0000-000000000002"
+  "cenk": "00000000-0000-0000-0000-000000000002",
+  "boterma": "00000000-0000-0000-0000-000000000003"
 };
 
 const PROJECT_MEMBERSHIPS: Record<string, string[]> = {
-  // admin => [music, finance], cenk => [finance]
-  [MOCK_MEMBERS.admin]: ["10000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000001"],
-  [MOCK_MEMBERS.cenk]: ["20000000-0000-0000-0000-000000000001"]
+  // admin => [music, finance, boterma], cenk => [finance], boterma => [boterma]
+  [MOCK_MEMBERS.admin]: ["10000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000001", "30000000-0000-0000-0000-000000000001"],
+  [MOCK_MEMBERS.cenk]: ["20000000-0000-0000-0000-000000000001"],
+  [MOCK_MEMBERS.boterma]: ["30000000-0000-0000-0000-000000000001"]
 };
 
 /* ── Get project by slug ── */

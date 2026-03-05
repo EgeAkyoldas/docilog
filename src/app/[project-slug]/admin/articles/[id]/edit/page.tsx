@@ -6,5 +6,6 @@ export default async function EditArticlePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  console.log(`[INDEX-12] Rendering EditArticlePage (/admin/articles/${id}/edit)`);
   return <ArticleEditor articleId={id} />;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Sparkles, Loader2, X, ImageIcon, ImagePlus, Search,
+  Sparkles, Loader2, X, ImageIcon, ImagePlus, Search, Trash2,
   Copy, Check, Monitor, Smartphone, Plus, Download,
   Zap, PenTool, Image as ImageLucide, MessageSquare,
   ChevronDown,
@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { aiActions } from "./constants";
 import type { AIAction } from "./types";
+import { AIChatPanel } from "./AIChatPanel";
+import type { ChatMessage } from "../hooks/useAIChat";
 
 interface AIPanelProps {
   projectSlug: string;
@@ -46,7 +48,7 @@ interface AIPanelProps {
   autoBlogProgress: string;
   autoBlogIncludeImages: boolean;
   onAutoBlogIncludeImagesChange: (v: boolean) => void;
-  onGenerateAutoBlog: (topic: string) => void;
+  onGenerateAutoBlog: (topic: string, referenceImages?: string[]) => void;
   // Tags
   autoTags: string[];
   onRemoveTag: (tag: string) => void;
@@ -55,6 +57,22 @@ interface AIPanelProps {
   // Persona
   selectedPersona: string;
   onPersonaChange: (persona: string) => void;
+  // ─── Chat Mode ───
+  panelMode: "assistant" | "chat";
+  onPanelModeChange: (mode: "assistant" | "chat") => void;
+  chatMessages: ChatMessage[];
+  chatInput: string;
+  chatStreaming: boolean;
+  chatAttachedImages: string[];
+  chatScrollRef: React.RefObject<HTMLDivElement | null>;
+  onChatSend: (text: string) => void;
+  onChatInputChange: (v: string) => void;
+  onChatPaste: (e: React.ClipboardEvent) => void;
+  onChatRemoveImage: (i: number) => void;
+  onChatGenerateImage: (prompt: string) => void;
+  onChatInsertToEditor: (url: string) => void;
+  onChatApplyEdit: (html: string) => void;
+  onChatClearHistory: () => void;
 }
 
 const SIZE_OPTIONS = [
@@ -113,11 +131,46 @@ function PanelContent({
   autoTags, onRemoveTag, onBlogReady,
   selectedPersona, onPersonaChange,
   onClose,
+  panelMode, onPanelModeChange,
+  chatMessages, chatInput, chatStreaming, chatAttachedImages, chatScrollRef,
+  onChatSend, onChatInputChange, onChatPaste, onChatRemoveImage,
+  onChatGenerateImage, onChatInsertToEditor, onChatApplyEdit, onChatClearHistory,
 }: Omit<AIPanelProps, "open"> & { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const [editingMeta, setEditingMeta] = useState(false);
   const [editMetaText, setEditMetaText] = useState("");
   const [autoBlogTopic, setAutoBlogTopic] = useState("");
+  const [autoBlogRefImages, setAutoBlogRefImages] = useState<string[]>([]);
+
+  // Handle paste for auto blog reference images
+  const handleAutoBlogPaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", "reference");
+        try {
+          const res = await fetch(`/api/v1/${projectSlug}/upload`, {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+          if (data.url) {
+            setAutoBlogRefImages(prev => [...prev, data.url]);
+          }
+        } catch {
+          const objectUrl = URL.createObjectURL(file);
+          setAutoBlogRefImages(prev => [...prev, objectUrl]);
+        }
+        break;
+      }
+    }
+  };
   // Dynamic personas from API
   const [personaOptions, setPersonaOptions] = useState(INITIAL_PERSONAS);
   useEffect(() => {
@@ -172,18 +225,44 @@ function PanelContent({
   };
 
   return (
-    <div className="w-full">
-      {/* Header */}
+    <div className="w-full h-full flex flex-col">
+      {/* Header with Toggle */}
       <div
-        className="flex items-center justify-between px-4 py-3"
+        className="flex items-center justify-between px-3 py-2.5 shrink-0"
         style={{ borderBottom: "1px solid var(--color-brand-border)" }}
       >
         <div className="flex items-center gap-2">
-          <Sparkles size={14} style={BRAND_TEXT} />
-          <span className="text-heading text-[13px] font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
-            AI Asistan
-          </span>
-          {/* Active language badge */}
+          {/* Segmented Toggle */}
+          <div
+            className="flex micro-radius overflow-hidden"
+            style={{ border: "1px solid var(--color-brand-border)" }}
+          >
+            <button
+              onClick={() => onPanelModeChange("assistant")}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wider transition-colors"
+              style={
+                panelMode === "assistant"
+                  ? BTN_FILLED
+                  : { color: "var(--color-text-muted)", backgroundColor: "var(--color-surface)" }
+              }
+            >
+              <Sparkles size={10} />
+              Asistan
+            </button>
+            <button
+              onClick={() => onPanelModeChange("chat")}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold tracking-wider transition-colors"
+              style={
+                panelMode === "chat"
+                  ? BTN_FILLED
+                  : { color: "var(--color-text-muted)", backgroundColor: "var(--color-surface)" }
+              }
+            >
+              <MessageSquare size={10} />
+              Chat
+            </button>
+          </div>
+          {/* Language badge */}
           <span
             className="px-1.5 py-0.5 text-[9px] font-bold tracking-widest micro-radius"
             style={BTN_FILLED}
@@ -196,6 +275,27 @@ function PanelContent({
         </button>
       </div>
 
+      {/* ─── CHAT MODE ─── */}
+      {panelMode === "chat" ? (
+        <AIChatPanel
+          projectSlug={projectSlug}
+          language={language}
+          messages={chatMessages}
+          inputValue={chatInput}
+          isStreaming={chatStreaming}
+          attachedImages={chatAttachedImages}
+          scrollRef={chatScrollRef}
+          onSend={onChatSend}
+          onInputChange={onChatInputChange}
+          onPaste={onChatPaste}
+          onRemoveAttachedImage={onChatRemoveImage}
+          onGenerateImage={onChatGenerateImage}
+          onInsertToEditor={onChatInsertToEditor}
+          onApplyEdit={onChatApplyEdit}
+          onClearHistory={onChatClearHistory}
+        />
+      ) : (
+      <div className="flex-1 overflow-y-auto">
       {/* ─── AUTO BLOG ─── */}
       <div
         className="p-3"
@@ -240,12 +340,40 @@ function PanelContent({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && autoBlogTopic.trim()) {
                 e.preventDefault();
-                onGenerateAutoBlog(autoBlogTopic);
+                onGenerateAutoBlog(autoBlogTopic, autoBlogRefImages.length > 0 ? autoBlogRefImages : undefined);
               }
             }}
+            onPaste={handleAutoBlogPaste}
           />
         </div>
-        <div className="flex items-center gap-2 mb-2">
+
+        {/* Reference images */}
+        {autoBlogRefImages.length > 0 && (
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            {autoBlogRefImages.map((url, i) => (
+              <div key={i} className="relative group w-14 h-14 micro-radius overflow-hidden border" style={{ borderColor: "#2a9d8f" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`Ref ${i}`} className="w-full h-full object-cover" />
+                <button
+                  onClick={() => setAutoBlogRefImages(prev => prev.filter((_, idx) => idx !== i))}
+                  className="absolute top-0 right-0 p-0.5 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={8} />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-[7px] text-white text-center py-0.5">REF</div>
+              </div>
+            ))}
+            <button
+              onClick={() => setAutoBlogRefImages([])}
+              className="text-[9px] text-muted hover:text-heading self-center ml-1"
+              title="Tümünü kaldır"
+            >
+              <Trash2 size={10} />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -257,7 +385,7 @@ function PanelContent({
           </label>
         </div>
         <button
-          onClick={() => onGenerateAutoBlog(autoBlogTopic)}
+          onClick={() => onGenerateAutoBlog(autoBlogTopic, autoBlogRefImages.length > 0 ? autoBlogRefImages : undefined)}
           disabled={autoBlogLoading || !autoBlogTopic.trim()}
           className="w-full flex items-center justify-center gap-1.5 px-3 py-2 micro-radius text-[11px] font-bold disabled:opacity-30 transition-all"
           style={BTN_FILLED}
@@ -550,6 +678,8 @@ function PanelContent({
         </div>
       )}
     </div>
+    )}
+    </div>
   );
 }
 
@@ -565,7 +695,7 @@ export function AIPanel(props: AIPanelProps) {
             className="hidden lg:block shrink-0 overflow-hidden"
           >
             <div
-              className="w-[340px] card-boutique sticky top-0 max-h-screen overflow-y-auto"
+              className="w-[340px] card-boutique sticky top-0 h-screen flex flex-col overflow-hidden"
               style={PANEL_BG}
             >
               <PanelContent {...props} onClose={props.onClose} />
