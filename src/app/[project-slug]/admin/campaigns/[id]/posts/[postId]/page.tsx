@@ -698,8 +698,6 @@ export default function PostEditorPage() {
       const imgData = await res.json();
       if (imgData.url) {
         setImageUrl(imgData.url);
-        // Clear reference images after they've been used for generation
-        if (refs.length > 0) setRefImages([]);
       }
     } catch { /* silent */ } finally { setAiGenRunning(false); }
   }, [projectSlug, aspectRatio]);
