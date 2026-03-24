@@ -328,30 +328,47 @@ actions:
 
     Language: {language}
 
-# ─── IMAGE GENERATION ENGINE (V3) ──────────────────────────
+# ─── IMAGE GENERATION ENGINE (V4 — Optimized) ──────────────────────────
 image_prompt: |
-  PHOTOGRAPHIC SPECIFICATIONS:
-  - Subject: {prompt}
-  - Context: {article_title}
-  - Style: Professional Financial Editorial. Clean, authoritative, dynamic.
-  - Camera: Sony A1, 50mm f/1.4 GM lens. Clinical focus, sharp details.
-  - Lighting: {lighting_style} (Default to cool blue-toned studio or Bloomberg terminal ambient glow if none specified).
-  - Focus: Sharp subject, professional or data-driven backgrounds.
-  - Color: Cool blues, steel grays, muted gold accents, dark navy, deep greens.
-  - Mood: Analytical, trustworthy, institutional, serious.
+  Create a single photorealistic photograph with these specifications:
 
-  ARTICLE CONTEXT:
+  SUBJECT & SCENE:
+  - Subject: {prompt}
+  - Article Context: {article_title}
   - Theme: {article_context}
 
-  NEGATIVE PROMPT (STRICT):
-  No text, no logos, no watermarks, no distorted elements, no messy backgrounds,
-  no cartoons, no illustration style, no low resolution, no multiple versions in one frame,
-  no stock photo watermarks, no cheap-looking props, no overly happy faces, no unrealistic flying money.
-  Photorealistic only. Professional financial aesthetic.
+  PHOTOGRAPHIC STYLE:
+  - Style: Professional Financial Editorial Photography. Clean, authoritative, dynamic, cinematic.
+  - Camera: Sony A1, 50mm f/1.4 GM lens. Clinical focus, sharp details.
+  - Lighting: Cool blue-toned studio lighting with Bloomberg terminal ambient glow. Dramatic side lighting for depth. Professional office/trading floor atmosphere.
+  - Focus: Sharp subject with professional or data-driven backgrounds.
+  - Color Palette: Cool blues, steel grays, muted gold accents, dark navy, deep greens, charcoal.
+  - Mood: Analytical, trustworthy, institutional, serious.
 
-  CONSISTENCY RULE:
+  COMPOSITION (CRITICAL):
+  - The image MUST fill the entire frame edge-to-edge with visual content.
+  - NO empty space, NO blank areas, NO margins, NO borders.
+  - Rich, detailed background that complements the financial theme.
+  - Every pixel must contain meaningful visual information.
+
+  ASPECT RATIO (MANDATORY):
+  - Generate this image in exactly {dimension}. This is non-negotiable.
+  - If landscape: compose with wide horizontal framing.
+  - If portrait: compose with tall vertical framing.
+  - If square: compose with centered balanced framing.
+
+  ABSOLUTE PROHIBITIONS:
+  - Absolutely NO text, NO letters, NO words, NO numbers, NO typography, NO captions, NO labels, NO titles, NO subtitles anywhere in the image.
+  - Absolutely NO white backgrounds, NO blank backgrounds, NO solid color backgrounds, NO empty areas.
+  - NO logos, NO watermarks, NO stamps, NO signatures.
+  - NO cartoons, NO illustrations, NO clip art, NO vector art, NO infographics.
+  - NO distorted elements, NO unrealistic flying money, NO fake stock charts.
+  - NO multiple versions in one frame, NO collages, NO split screens.
+  - NO low resolution, NO pixelation, NO artifacts.
+  - NO cheap-looking props, NO overly happy faces.
+  - Photorealistic ONLY. Professional financial aesthetic.
+
+  CONSISTENCY:
   All images in this article share the same visual language —
   same color temperature, same lighting style, same photographic approach.
-  Think of them as a cohesive photo series for one article spread.
-
-  FORMAT: Generate in {dimension}.
+  A cohesive photo series for one premium financial article spread.

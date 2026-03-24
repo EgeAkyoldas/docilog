@@ -314,30 +314,47 @@ actions:
 
     Language: {language}
 
-# ─── IMAGE GENERATION ENGINE (V3) ──────────────────────────
+# ─── IMAGE GENERATION ENGINE (V4 — Optimized) ──────────────────────────
 image_prompt: |
-  PHOTOGRAPHIC SPECIFICATIONS:
-  - Subject: {prompt}
-  - Context: {article_title}
-  - Style: Professional Editorial Photography. Moody and artistic.
-  - Camera: Sony A1, 85mm f/1.4 GM lens. Natural textures, meaningful bokeh.
-  - Lighting: {lighting_style}
-  - Focus: Sharp subject, creamy bokeh backgrounds (f/2.8).
-  - Color: Warm tones — cream, amber, deep brown, muted gold.
-  - Mood: Educational, inviting, professional but approachable.
+  Create a single photorealistic photograph with these specifications:
 
-  ARTICLE CONTEXT:
+  SUBJECT & SCENE:
+  - Subject: {prompt}
+  - Article Context: {article_title}
   - Theme: {article_context}
 
-  NEGATIVE PROMPT (STRICT):
-  No text, no logos, no watermarks, no distorted anatomy, no messy backgrounds,
-  no cartoons, no illustration style, no low resolution, no multiple versions in one frame,
-  no stock photo watermarks, no cheap-looking instruments, no distorted fingers,
-  no fake stock-photo smiles. Photorealistic only.
+  PHOTOGRAPHIC STYLE:
+  - Style: Professional Editorial Photography. Moody, artistic, cinematic.
+  - Camera: Sony A1, 85mm f/1.4 GM lens. Natural textures, meaningful bokeh.
+  - Lighting: Warm studio lighting with natural window light accents. Golden hour tones. Soft directional light creating depth and dimension.
+  - Focus: Sharp subject with creamy bokeh backgrounds (f/2.8).
+  - Color Palette: Warm tones — cream, amber, deep brown, muted gold, rich mahogany.
+  - Mood: Educational, inviting, professional but approachable.
 
-  CONSISTENCY RULE:
+  COMPOSITION (CRITICAL):
+  - The image MUST fill the entire frame edge-to-edge with visual content.
+  - NO empty space, NO blank areas, NO margins, NO borders.
+  - Rich, detailed background that complements the subject.
+  - Every pixel must contain meaningful visual information.
+
+  ASPECT RATIO (MANDATORY):
+  - Generate this image in exactly {dimension}. This is non-negotiable.
+  - If landscape: compose with wide horizontal framing.
+  - If portrait: compose with tall vertical framing.
+  - If square: compose with centered balanced framing.
+
+  ABSOLUTE PROHIBITIONS:
+  - Absolutely NO text, NO letters, NO words, NO numbers, NO typography, NO captions, NO labels, NO titles, NO subtitles anywhere in the image.
+  - Absolutely NO white backgrounds, NO blank backgrounds, NO solid color backgrounds, NO empty areas.
+  - NO logos, NO watermarks, NO stamps, NO signatures.
+  - NO cartoons, NO illustrations, NO clip art, NO vector art.
+  - NO distorted anatomy, NO distorted fingers, NO extra limbs.
+  - NO multiple versions in one frame, NO collages, NO split screens.
+  - NO low resolution, NO pixelation, NO artifacts.
+  - NO cheap-looking instruments, NO fake stock-photo smiles.
+  - Photorealistic ONLY.
+
+  CONSISTENCY:
   All images in this article share the same visual language —
   same color temperature, same lighting style, same photographic approach.
-  Think of them as a cohesive photo series for one article spread.
-
-  FORMAT: Generate in {dimension}.
+  A cohesive photo series for one premium article spread.

@@ -84,8 +84,8 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
           prompt: imagePromptText || title || "Professional blog image",
           articleSlug: slug || "untitled",
           aspectRatio: aiImageSize,
-          articleTitle: title || "Music Education",
-          articleContext: `Article about: ${title}. Generate a cover image that captures the essence of this topic.`,
+          articleTitle: title || "Professional Blog Article",
+          articleContext: `Professional editorial photograph for an article about: ${title}. Capture the essence and mood of this topic with rich visual storytelling.`,
         }),
       });
       if (res.ok) {
@@ -122,7 +122,7 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
           articleSlug: slug || "untitled",
           aspectRatio: aiImageSize,
           articleTitle: prompt,
-          articleContext: `Content image for an article about: ${prompt}`,
+          articleContext: `Professional editorial photograph for an article about: ${prompt}. Rich visual storytelling with cinematic quality.`,
         }),
       });
       if (res.ok) {
@@ -508,7 +508,7 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
               articleSlug: slug || "untitled",
               aspectRatio: ph.size,
               articleTitle,
-              articleContext: `Image #${i + 1} in article "${articleTitle}". Topic: ${topic}. Maintain visual consistency.`,
+              articleContext: `Image #${i + 1} for article "${articleTitle}". Maintain visual consistency with other images in this article. Professional editorial photography.`,
             }),
           })
             .then(async (res) => {
@@ -805,7 +805,7 @@ export function useAIAssistant(projectSlug: string, editor: Editor | null) {
               articleSlug: slug || "untitled",
               aspectRatio: ph.size,
               articleTitle,
-              articleContext: `Image ${i + 1} for blog-ready article "${articleTitle}". Maintain visual consistency.`,
+              articleContext: `Image ${i + 1} for article "${articleTitle}". Maintain visual consistency with other images. Professional editorial photography.`,
             }),
           })
             .then(async (res) => {

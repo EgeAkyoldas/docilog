@@ -139,8 +139,15 @@ function LeftPanel({ imageUrl, aspectRatio, projectSlug, visualPrompt, caption, 
   onCaptionChange: (c: string) => void; onHashtagsChange: (h: string[]) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showAIGen, setShowAIGen] = useState(false);
+
+  // Auto-resize caption textarea when value changes (AI fill, data load, etc.)
+  useEffect(() => {
+    const el = captionRef.current;
+    if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
+  }, [caption]);
 
   const d = RATIO[aspectRatio];
 
@@ -227,10 +234,10 @@ function LeftPanel({ imageUrl, aspectRatio, projectSlug, visualPrompt, caption, 
       {/* Caption */}
       <div className="flex flex-col gap-1.5">
         <p className="text-[9px] font-bold tracking-widest text-white/25 uppercase">Caption (TR)</p>
-        <textarea value={caption} onChange={(e) => onCaptionChange(e.target.value)}
+        <textarea ref={captionRef} value={caption} onChange={(e) => { onCaptionChange(e.target.value); requestAnimationFrame(() => { const el = captionRef.current; if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }); }}
           placeholder="AI chat ile üret veya yaz..."
-          className="resize-none text-[12px] px-3 py-2 rounded-xl outline-none leading-relaxed"
-          style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", minHeight: "80px" }} />
+          className="resize-none text-[12px] px-3 py-2 rounded-xl outline-none leading-relaxed overflow-hidden"
+          style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", minHeight: "48px" }} />
       </div>
 
       {/* Hashtags */}
@@ -637,14 +644,14 @@ export default function PostEditorPage() {
   const [personaName, setPersonaName] = useState("Aura");
 
   // Resizable panel widths
-  const [leftW, setLeftW] = useState(280);
-  const [rightW, setRightW] = useState(310);
+  const [leftW, setLeftW] = useState(420);
+  const [rightW, setRightW] = useState(420);
 
   const handleLeftDrag = useCallback((dx: number) => {
-    setLeftW((w) => Math.max(200, Math.min(480, w + dx)));
+    setLeftW((w) => Math.max(200, Math.min(600, w + dx)));
   }, []);
   const handleRightDrag = useCallback((dx: number) => {
-    setRightW((w) => Math.max(240, Math.min(500, w - dx)));
+    setRightW((w) => Math.max(240, Math.min(600, w - dx)));
   }, []);
 
   useEffect(() => {

@@ -337,28 +337,52 @@ actions:
 # ═══════════════════════════════════════════════════════════════════
 
 image_prompt: |
-  LIFESTYLE INTERIOR DESIGN PHOTOGRAPHY:
+  Create a single photorealistic lifestyle interior design photograph with these specifications:
+
+  SUBJECT & SCENE:
   - Subject: {prompt}
-  - Context: {article_title}
-  - Style: Real home, lifestyle photography. NOT a showroom, NOT a catalog.
+  - Article Context: {article_title}
+  - Theme: {article_context}
+
+  PHOTOGRAPHIC STYLE:
+  - Style: Real home, lifestyle photography. NOT a showroom, NOT a catalog. Cinematic and aspirational.
   - Camera: Sony A7R V, 35mm f/1.4 natural wide or 85mm f/1.2 detail. Warm bokeh.
-  - Lighting: Golden hour warm ambient (2700-3200K). Soft table lamp glow or natural window light.
-  - Color: Warm palette — cream, amber, terracotta, sage, soft gold, deep walnut, muted blush.
+  - Lighting: Golden hour warm ambient (2700-3200K). Soft table lamp glow or natural window light streaming in. Warm directional light creating depth and cozy atmosphere.
+  - Color Palette: Warm palette — cream, amber, terracotta, sage, soft gold, deep walnut, muted blush.
   - Mood: Cozy, aspirational but achievable. Feels like someone's actual beautiful home.
-  - Atmosphere: Lived-in, curated but not staged.
+  - Atmosphere: Lived-in, curated but not staged. Personal and inviting.
 
   BOTERMA CONTEXT:
   - Brand: Boterma — Smart lighting & home interior decor, Istanbul
   - If a Boterma product is mentioned: style it naturally in the scene, not as a hero product shot.
-  - Theme: {article_context}
 
-  NEGATIVE PROMPT (STRICT):
-  No text, no logos, no watermarks, no distorted elements, no cartoons, no illustration.
-  No sterile showroom, no catalog staging, no harsh fluorescent lighting, no cold clinical tones.
-  No multiple versions in one frame, no cheap furniture, no stock photo aesthetic.
-  Photorealistic lifestyle interior design only. Feels like a real home.
+  COMPOSITION (CRITICAL):
+  - The image MUST fill the entire frame edge-to-edge with visual content.
+  - NO empty space, NO blank areas, NO margins, NO borders.
+  - Rich, detailed interior scene that feels warm and lived-in.
+  - Every pixel must contain meaningful visual information.
 
-  FORMAT: Generate in {dimension}.
+  ASPECT RATIO (MANDATORY):
+  - Generate this image in exactly {dimension}. This is non-negotiable.
+  - If landscape: compose with wide horizontal framing showing more of the room.
+  - If portrait: compose with tall vertical framing, ideal for Instagram stories.
+  - If square: compose with centered balanced framing, ideal for Instagram feed.
+
+  ABSOLUTE PROHIBITIONS:
+  - Absolutely NO text, NO letters, NO words, NO numbers, NO typography, NO captions, NO labels, NO titles, NO subtitles anywhere in the image.
+  - Absolutely NO white backgrounds, NO blank backgrounds, NO solid color backgrounds, NO empty areas.
+  - NO logos, NO watermarks, NO stamps, NO signatures.
+  - NO cartoons, NO illustrations, NO clip art, NO vector art.
+  - NO sterile showroom staging, NO catalog photography, NO harsh fluorescent lighting.
+  - NO cold clinical tones, NO cheap furniture, NO stock photo aesthetic.
+  - NO multiple versions in one frame, NO collages, NO split screens.
+  - NO low resolution, NO pixelation, NO artifacts.
+  - Photorealistic lifestyle interior design ONLY. Must feel like a real home.
+
+  CONSISTENCY:
+  All images in this article share the same visual language —
+  same color temperature, same lighting style, same photographic approach.
+  A cohesive photo series for one premium lifestyle article spread.
 
 # ═══════════════════════════════════════════════════════════════════
 # 9. BLOG/ARTICLE ACTIONS (mevcut editor için)

@@ -50,17 +50,18 @@ export async function POST(
       return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
     }
 
-    // Map aspect ratio to dimension instruction
+    // Map aspect ratio to explicit dimension and composition instruction
     const dimensionMap: Record<string, string> = {
-      "1:1": "square format (1:1 aspect ratio)",
-      "3:4": "portrait format (3:4 aspect ratio)",
-      "9:16": "tall portrait format (9:16 aspect ratio)",
-      "16:9": "wide landscape format (16:9 aspect ratio)",
-      landscape: "wide landscape format (16:9 aspect ratio)",
-      portrait: "tall portrait format (9:16 aspect ratio)",
-      square: "square format (1:1 aspect ratio)",
+      "1:1": "SQUARE format (1:1 aspect ratio). Compose with perfectly centered balanced framing",
+      "3:4": "PORTRAIT format (3:4 aspect ratio). Compose with vertical framing, taller than wide",
+      "4:3": "LANDSCAPE format (4:3 aspect ratio). Compose with wide horizontal framing",
+      "9:16": "TALL PORTRAIT format (9:16 aspect ratio). Compose with very tall vertical framing, ideal for mobile/stories",
+      "16:9": "WIDE LANDSCAPE format (16:9 aspect ratio). Compose with cinematic wide horizontal framing",
+      landscape: "WIDE LANDSCAPE format (16:9 aspect ratio). Compose with cinematic wide horizontal framing",
+      portrait: "TALL PORTRAIT format (9:16 aspect ratio). Compose with very tall vertical framing",
+      square: "SQUARE format (1:1 aspect ratio). Compose with perfectly centered balanced framing",
     };
-    const dimensionHint = dimensionMap[aspectRatio] || "square format (1:1 aspect ratio)";
+    const dimensionHint = dimensionMap[aspectRatio] || "WIDE LANDSCAPE format (16:9 aspect ratio). Compose with cinematic wide horizontal framing";
 
     // Load image prompt from Project Config or Fallback
     const config = project ? await loadAIPromptsFromDB(project.id) : loadAIPrompts(projectSlug);
@@ -95,6 +96,28 @@ export async function POST(
       parts.push({ text: imagePrompt });
     }
 
+    // Map named aspect ratios to API-compatible values (from Bananator working_ratios.ts)
+    const apiRatioMap: Record<string, string> = {
+      landscape: "16:9",
+      portrait: "9:16",
+      square: "1:1",
+    };
+    const apiAspectRatio = apiRatioMap[aspectRatio] || aspectRatio || "16:9";
+
+    // Build generationConfig with native imageConfig.aspectRatio
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const generationConfig: Record<string, any> = {
+      responseModalities: ["TEXT", "IMAGE"],
+    };
+
+    // Add imageConfig with native aspect ratio support (Gemini API parameter)
+    if (apiAspectRatio && apiAspectRatio !== "auto") {
+      generationConfig.imageConfig = {
+        aspectRatio: apiAspectRatio,
+      };
+      console.log(`[AI Image] Native imageConfig.aspectRatio = ${apiAspectRatio}`);
+    }
+
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
@@ -102,9 +125,7 @@ export async function POST(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: {
-            responseModalities: ["TEXT", "IMAGE"],
-          },
+          generationConfig,
         }),
       }
     );
